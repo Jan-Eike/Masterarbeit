@@ -6,3 +6,8 @@
 /trained/
 /*.txt
 /*.bin
+/final_df_test.csv
+/final_df_train.csv
+/perplexity.csv
+/probs.csv
+*.json
