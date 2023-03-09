@@ -11,3 +11,4 @@
 /perplexity.csv
 /probs.csv
 *.json
+../.vscode/

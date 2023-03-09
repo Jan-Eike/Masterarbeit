@@ -71,7 +71,7 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
 
     tokenizer = transformers.RobertaTokenizer.from_pretrained("roberta-base")
-    test_df = read_csv("../Task{}_test-without-labels.csv".format(args.task), encoding="utf8")
+    test_df = read_csv("../Task{}_test-without-labels_original.csv".format(args.task), encoding="utf8")
     test_dataset = ClassificationDataset(f_subtask=args.task,
                                          f_tokenizer=tokenizer,
                                          f_data=test_df,
