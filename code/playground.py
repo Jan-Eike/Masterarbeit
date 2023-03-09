@@ -7,7 +7,8 @@ import torch
 import pandas as pd
 from datasets import Dataset
 from sklearn.model_selection import train_test_split
-from transformers import DataCollatorForLanguageModeling
+from sklearn.metrics import f1_score, accuracy_score, recall_score, precision_score, roc_auc_score
+from transformers import DataCollatorForLanguageModeling, EarlyStoppingCallback, IntervalStrategy
 import transformers
 from load_data import load_data, load_file
 # %%
@@ -52,7 +53,7 @@ tokenized_train_pre = train_pre_dataset.map(tokenize_function, batched=True)
 tokenized_test_pre = test_pre_dataset.map(tokenize_function, batched=True)
 print(tokenized_train_pre)
 # %%
-save = "./models/model1"
+save = "./models/model2"
 # %%
 model = AutoModelForMaskedLM.from_pretrained("./").to("cuda:0")
 # %%
@@ -63,19 +64,20 @@ trainer = transformers.Trainer(
     train_dataset=tokenized_train_pre,
     eval_dataset=tokenized_test_pre,
     data_collator=data_collator,
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=2)],
     args=transformers.TrainingArguments(
-        output_dir="./",
+        output_dir=save,
         overwrite_output_dir=False,
         per_device_train_batch_size=3,
         per_device_eval_batch_size=3,
-        num_train_epochs=3,
+        num_train_epochs=50,
         warmup_steps=100,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=2,
         load_best_model_at_end=True,
+        evaluation_strategy = IntervalStrategy.STEPS, # "steps"
+        eval_steps = 50, # Evaluation and Save happens every 50 steps
+        save_total_limit = 10, # Only last 5 models are saved. Older ones are deleted.
         metric_for_best_model="eval_loss",
-        greater_is_better=False,
+        eval_accumulation_steps=10
     )
 )
 
@@ -109,19 +111,20 @@ trainer = transformers.Trainer(
     train_dataset=tokenized_train_pre_chatgpt,
     eval_dataset=tokenized_test_pre_chatgpt,
     data_collator=data_collator,
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=2)],
     args=transformers.TrainingArguments(
         output_dir=save,
         overwrite_output_dir=False,
         per_device_train_batch_size=3,
         per_device_eval_batch_size=3,
-        num_train_epochs=15,
+        num_train_epochs=50,
         warmup_steps=100,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=2,
         load_best_model_at_end=True,
+        evaluation_strategy = IntervalStrategy.STEPS, # "steps"
+        eval_steps = 50, # Evaluation and Save happens every 50 steps
+        save_total_limit = 10, # Only last 5 models are saved. Older ones are deleted.
         metric_for_best_model="eval_loss",
-        greater_is_better=False,
+        eval_accumulation_steps=10
     )
 )
 
@@ -139,19 +142,20 @@ trainer = transformers.Trainer(
     train_dataset=tokenized_train,
     eval_dataset=tokenized_val,
     data_collator=data_collator,
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=2)],
     args=transformers.TrainingArguments(
         output_dir=save,
         overwrite_output_dir=False,
         per_device_train_batch_size=3,
         per_device_eval_batch_size=3,
-        num_train_epochs=3,
+        num_train_epochs=50,
         warmup_steps=100,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        save_total_limit=2,
         load_best_model_at_end=True,
+        evaluation_strategy = IntervalStrategy.STEPS, # "steps"
+        eval_steps = 50, # Evaluation and Save happens every 50 steps
+        save_total_limit = 10, # Only last 5 models are saved. Older ones are deleted.
         metric_for_best_model="eval_loss",
-        greater_is_better=False,
+        eval_accumulation_steps=10
     )
 )
 
@@ -543,7 +547,6 @@ num_round = 10000
 # %%
 validation_data = lgb.Dataset(x_test, label=y_test)
 # %%
-from sklearn.metrics import f1_score
 def round2(x, nump=True):
     if nump == True:
         return np.round(x)

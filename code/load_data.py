@@ -1,5 +1,7 @@
 import pandas as pd
 from datasets import Dataset
+from os import listdir
+from sklearn.model_selection import train_test_split
 
 def load_file(file="TaskA_train.csv"):
     df = pd.read_csv(file)[["topic", "Premise", "Conclusion", "Validity"]]
@@ -8,9 +10,11 @@ def load_file(file="TaskA_train.csv"):
         " <_p> " + df["Premise"].apply(lambda x: x[:-1]) + 
         ". <_c> " + df["Conclusion"]
     )
+
     df = df.drop(["topic", "Premise", "Conclusion"], axis=1)
     df = df.rename({"Validity": "labels"}, axis=1)
     df["labels"] = df.labels.apply(lambda x: 0 if x == -1 else x)
+
     return df
 
 
@@ -21,3 +25,48 @@ def load_data(files):
         ds = Dataset.from_pandas(df)
         datasets.append(ds)
     return datasets
+
+
+def load_pretraining_data(location="./argumentUnits"):
+    files = listdir(location)
+    train_pre = []
+    for file in files:
+        with open(location + "/" + file) as f:
+            lines = f.readlines()
+            lines = " ".join(lines)
+        train_pre.append(lines)
+
+    train_pre = [s.replace("\n", "") for s in train_pre]
+    train_pre = [s.replace("\"", "") for s in train_pre]
+    train_pre = [s.replace("\'", "") for s in train_pre]
+
+    train_pre_df = pd.DataFrame({"text": train_pre})
+
+    train_pre_df, test_pre_df = train_test_split(train_pre_df, train_size=0.9)
+
+    train_pre_dataset = Dataset.from_pandas(train_pre_df)
+    test_pre_dataset = Dataset.from_pandas(test_pre_df)
+
+    return train_pre_dataset, test_pre_dataset
+
+
+def first_word_to_lower(line: str) -> str:
+    return " ".join(i[0].lower()+i[1:] for i in line.split(" "))
+
+
+def load_chatGPT_data(file="./train_chatgpt.txt"):
+    with open(file) as f:
+        train_pre_chatgpt = f.readlines()
+    
+    train_pre_chatgpt = [s.replace("\n", "") for s in train_pre_chatgpt]
+    train_pre_chatgpt = [s.split(": ")[-1] for s in train_pre_chatgpt]
+    train_pre_chatgpt = [". ".join(s.split(". ")[:-1]) + ", <_c> " + first_word_to_lower(s.split(". ")[-1]) for s in train_pre_chatgpt]
+
+    train_pre_chatgpt_df = pd.DataFrame({"text": train_pre_chatgpt})
+
+    train_pre_chatgpt_df, test_pre_chatgpt_df = train_test_split(train_pre_chatgpt_df, train_size=0.9)
+
+    train_pre_chatgpt_dataset = Dataset.from_pandas(train_pre_chatgpt_df)
+    test_pre_chatgpt_dataset = Dataset.from_pandas(test_pre_chatgpt_df)
+
+    return train_pre_chatgpt_dataset, test_pre_chatgpt_dataset
