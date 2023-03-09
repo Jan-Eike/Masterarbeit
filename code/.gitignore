@@ -4,7 +4,6 @@
 /BaselinePrediction/.out/roberta-base/subtask B/Novelty-3/
 /checkpoint*
 /trained/
-/*.txt
 /*.bin
 /final_df_test.csv
 /final_df_train.csv
@@ -12,3 +11,8 @@
 /probs.csv
 *.json
 ../.vscode/
+/x_train.txt
+/x_test.txt
+/y_train.txt
+/y_test.txt
+/test.txt
