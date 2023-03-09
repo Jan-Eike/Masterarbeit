@@ -1,0 +1,12 @@
+Is space-based solar power a good idea?
+Space-based solar power is scalable.
+Space-based solar power is steady and weather independent.
+Insolation is stronger in space than after passing through the Earth's atmosphere.
+The concentration of sunlight is easier to achieve in space than on Earth's surface.
+Space-based solar power would require only a negligible amount of land.
+Lightweight, inflatable structures based on thin film solar cells may be suitable for deployment in space even with current launch systems.
+Transmission of the generated power from space to Earth poses a significant technological challenge.
+Solar wind would tend to move the solar panels.
+Space radiation degrade solar panels.
+Large scale deployment of solar panels in space is unimaginable without a major breakthrough in space transport.
+Microwave or laser power beam could be used as a weapon.

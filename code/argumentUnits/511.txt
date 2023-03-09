@@ -1,0 +1,22 @@
+Should governments choose open source software in order to encourage its use?
+The openness of open-source software produces faster, more responsive, and more robust improvements in software:
+While open source software is not always free, it tends to be significantly cheaper than closed source alternatives and can save governments money.
+Open-source software can pressure the reduction in the prices of closed-source software:
+Open-source software, because it is typically cheaper, can be spread more widely, such that citizens and governments operate on the same systems and more commonly, to the benefit of democracy:
+There are many examples of mainstream companies going open-source for its advantages:
+Open-source software is often effectively publicly owned and can be used for key public interest activities, vs. private ownership, which prevents this from happening:
+Open-source software can be adapted to specialized uses much more easily than closed-source software:
+Opens-source technology avoids patent hold-ups and legal liabilities:
+Open-source products lack innovativeness and are inferior to centrally produced products:
+Real innovation is driven by the profit motive and comes from the knowledge that a firm can capitalize on a discovery:
+The open-source bazaar approach is actually tending back toward the traditional cathedral approach, because it is superior:
+Open source software is often confused with free software but in fact it is usually provided at some cost to the user:
+Open-source software usually lacks customer support and trouble shooting like closed-source software, meaning governments have to pay extra for that support:
+Transitioning to open-source technology is prohibitively expensive:
+Managing and updating open-source technology is too difficult and costly for it to be adopted throughout society on a large scale:
+Certain firms have adopted open-source technologies out of desperation in the face of competition, possibly indicating that this shift will not be long-term, and should not be followed:
+Even if closed source software firms are ultimately answerable to their shareholders, their shareholders want them to produce software which meets the needs of their customers so that they can sell their products:
+Closed source software companies are more than capable of segmenting their products to reach each part of the market:
+Patents encourage investment:
+Tech firms are frequently arriving at a legal balance and mutual understanding not to sue each other:
+Open-source legal frameworks are actually fairly vulnerable to legal problems:
