@@ -1,3 +1,0 @@
-Should "GNU/Linux" be used instead of "Linux" to describe the full system?
-The system started as the GNU Project.
-Linux is not part of the GNU project.
