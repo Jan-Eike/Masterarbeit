@@ -1,0 +1,9 @@
+Debating the pros and cons of proposals to improve Debatepedia.org
+Rating system would allow polling on quality of arguments.
+Voting system would provide feedback.
+Abuse of the voting system can be prevented.
+Debating stands on moral pillars.
+Creating rating system would require major software developments.
+These votes can never be 100% reliable and accurate.
+Voting on arguments could just follow partisan lines.
+Creating an elite.
