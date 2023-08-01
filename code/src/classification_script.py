@@ -54,12 +54,13 @@ def load_all_datasets():
 
     # load arg quality data
     train_arg_quality, test_arg_quality, val_arg_quality = load_arg_quality()
-    train_arg_quality_complete = train_arg_quality.to_pandas()
-    test_arg_quality_complete = test_arg_quality.to_pandas()
-    val_arg_quality_complete = val_arg_quality.to_pandas()
-    complete_arg_quality = Dataset.from_pandas(pd.concat([train_arg_quality_complete, test_arg_quality_complete, val_arg_quality_complete], ignore_index=True))
+    #train_arg_quality_complete = train_arg_quality.to_pandas()
+    #test_arg_quality_complete = test_arg_quality.to_pandas()
+    #val_arg_quality_complete = val_arg_quality.to_pandas()
+    #complete_arg_quality = Dataset.from_pandas(pd.concat([train_arg_quality_complete, test_arg_quality_complete, val_arg_quality_complete], ignore_index=True))
 
-    arg_quality_data = complete_arg_quality
+    #arg_quality_data = complete_arg_quality
+    arg_quality_data = train_arg_quality, test_arg_quality, val_arg_quality
 
     return premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data
 
@@ -83,7 +84,7 @@ def preprocess_logits_for_metrics(logits, labels):
 
 
 def mean_pooling(model_output, attention_mask):
-    token_embeddings = model_output["hidden_states"][0] #First element of model_output contains all token embeddings
+    token_embeddings = model_output
     input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
     sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
     sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
@@ -91,15 +92,22 @@ def mean_pooling(model_output, attention_mask):
 
 
 def extract_bert_embeddings(dataset, tokenizer, model):
-    sentence_embeddings = []
-    for a in tqdm(range(len(dataset["text"])), desc="Calculating BERT Embeddings"):
-        input = tokenizer(dataset["text"][a], padding=True, truncation=True, max_length=512, return_tensors="pt")
-        model = model.to("cpu")
-        with torch.no_grad():
-            output = model(**input)
-        sentence_embeddings.append(mean_pooling(output, input['attention_mask']))
+    model = model.to("cpu")
+    with ProcessPoolExecutor(max_workers=4) as executor:
+        args = ((dataset, tokenizer, model, a) for a in range(len(dataset["text"])))
+        sentence_embeddings = list(tqdm(executor.map(extract_bert_embeddings_parallel, args), total=len(dataset["text"]), desc="Calculating BERT Embeddings"))
     sentence_embeddings = np.stack(sentence_embeddings, axis=0)
     return sentence_embeddings
+
+
+def extract_bert_embeddings_parallel(args):
+    dataset, tokenizer, model, a = args
+    input = tokenizer(dataset["text"][a], padding=True, truncation=True, max_length=512, return_tensors="pt")
+    with torch.no_grad():
+        output = model(**input)
+    embedding = mean_pooling(output["hidden_states"][-1], input["attention_mask"]) # mean pooling of all token embeddings
+    #embedding = output["hidden_states"][-1][:,0,:] # CLS token embedding
+    return  embedding
 
 
 def calculate_embedding_vector(dataset, tokenizer, model, words, word_mapping):
@@ -155,9 +163,6 @@ def calculate_embedding_vector_stance(dataset, tokenizer, model, words, word_map
         args = ((dataset, tokenizer, model, words, model_attributes, a) for a in range(len(dataset["text"])))
         probs = list(tqdm(executor.map(calculate_embedding_vector_stance_parallel, args), total=len(dataset["text"])))
 
-    print(dataset["text"][:5])
-    print(probs[:5])
-
     # sort probabilities with the word mapping order to always keep the same ordering
     probs_sorted = [sorted(x, key=lambda x: word_mapping[x[1]]) for x in probs]
 
@@ -188,7 +193,6 @@ def calculate_embedding_vector_stance_parallel(args):
     for i, masked_word in enumerate(masked_words_id):
         if tokenizer.decode(masked_word).lower() in words:
             probs_each.append((label, tokenizer.decode(masked_word), torch.nn.functional.softmax(masked_words_name, dim=-1)[i].item()))
-
     return probs_each
 
 
@@ -293,7 +297,10 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     premise_conclusion_train, premise_conclusion_test, premise_conclusion_dev = train_test_dev_split(premise_conclusion_data)
     train_pre_dataset, test_pre_dataset = train_test_split_custom(pretraining_data)
     train_pre_chatgpt_dataset, test_pre_chatgpt_dataset = train_test_split_custom(chatGPT_data)
-    train_arg_quality, test_arg_quality, dev_arg_quality = train_test_dev_split(arg_quality_data)
+    #train_arg_quality, test_arg_quality, dev_arg_quality = train_test_dev_split(arg_quality_data)
+    train_arg_quality, test_arg_quality, dev_arg_quality = arg_quality_data
+    for l in arg_quality_data:
+        print(l.shape)
     # tokenize premise conclusion data
     tokenized_train = premise_conclusion_train.map(tokenize_function, batched=True)
     tokenized_test = premise_conclusion_test.map(tokenize_function, batched=True)
@@ -309,11 +316,13 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     tokenized_test_arg_quality = test_arg_quality.map(tokenize_function, batched=True)
     tokenized_dev_arg_quality = dev_arg_quality.map(tokenize_function, batched=True)
 
-    print(tokenized_train["input_ids"])
-
     # load already fine tuned model
     if load_prev or not train:
         model = AutoModelForMaskedLM.from_pretrained(load, output_hidden_states=True).to(DEVICE)
+        trainer = transformers.Trainer(
+            model=model,
+        )
+        trainer.save_model(output_dir=save)
 
     # training arguments for all masked LM 
     training_args = transformers.TrainingArguments(
@@ -414,10 +423,12 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     
 
     baseline_scores = 0
+    model_class = None
     # baseline direct bert classification
     if baseline:
         num_labels = 2
-        model_class = BertForSequenceClassification.from_pretrained(save, num_labels=num_labels).to(DEVICE)
+        # save instead of model_attributes.model_checkpoint
+        model_class = BertForSequenceClassification.from_pretrained(model_attributes.model_checkpoint, num_labels=num_labels, output_hidden_states=True).to(DEVICE)
         training_args = transformers.TrainingArguments(
             output_dir=save,
             overwrite_output_dir=False,
@@ -446,9 +457,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         print(baseline_scores)
         trainer.save_model(output_dir=save+"/LM_classification")
 
-    model = AutoModelForMaskedLM.from_pretrained(save+"/LM_classification", output_hidden_states=True).to(DEVICE)
-    model_class = model
-    model_class = model_class.to("cpu")
+    model_class = model_class.to("cpu") if model_class is not None else model.to("cpu")
     model = model.to("cpu")
     # example masking
     text = f"This is a great {model_attributes.mask}."
@@ -464,7 +473,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     #words = ["t"herefore", "consequently", "hence", "thus", "so", "nevertheless", "however", "yet", "anyway", "although"]
     #words = ["t"he", "a", "hence", "thus", "and", "this", "he", "she", "it", "yet", "be", "to", "that", "for", "as", "have", "but", "by", "from", "say", "his", "her", "its", "with", "will", "can", "of", "in", "i", "not"]
 
-    words = list(dict.fromkeys([
+    words1 = list(dict.fromkeys([
         "the",
         "be",
         "and",
@@ -566,6 +575,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "more",
         "new",
     ]))
+
     """
     words = list(dict.fromkeys([
         "because",
@@ -590,6 +600,121 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "still"
     ]))
     """
+    words2 = list(dict.fromkeys([
+        x.lower() for x in [
+            "Accordingly",
+            "Consequently",
+            "Hence",
+            "Then",
+            "Therefore",
+            "Thus",
+            "Absolutely",
+            "Chiefly",
+            "Clearly",
+            "Definitely",
+            "Especially",
+            "Even",
+            "Importantly",
+            "Indeed",
+            "Naturally",
+            "Never",
+            "Obviously",
+            "Particularly",
+            "Positively",
+            "Surprisingly",
+            "Truly",
+            "Undoubtedly",
+            "Additionally",
+            "Also",
+            "And",
+            "Besides",
+            "Finally",
+            "First",
+            "Further",
+            "Furthermore",
+            "Last",
+            "Moreover",
+            "Second",
+            "Third",
+            "Too",
+            "Including",
+            "Like",
+            "Namely",
+            "Specifically",
+            "Alternatively",
+            "Conversely",
+            "However",
+            "Instead",
+            "Nevertheless",
+            "Nonetheless",
+            "Nor",
+            "Notwithstanding",
+            "Rather",
+            "Though",
+            "Unlike",
+            "Whereas",
+            "While",
+            "Yet",
+            "Alike",
+            "Both",
+            "Either",
+            "Equal",
+            "Equally",
+            "Likewise",
+            "Resembles",
+            "Similarly",
+            "Altogether",
+            "Briefly",
+            "Overall",
+            "Therefore",
+            "Ultimately",
+            "As",
+            "If",
+            "Since",
+            "Then",
+            "Unless",
+            "When",
+            "Whenever",
+            "While",
+            "Lest",
+            "Concerning",
+            "Considering",
+            "Regarding",
+            "Alternatively",
+            "Namely",
+            "Reiterated",
+            "Regularly",
+            "Typically",
+            "Mostly",
+            "Normally",
+            "Often",
+            "Commonly",
+            "because",
+            "although",
+            "therefore",
+            "but",
+            "still",
+            "whereas",
+            "while",
+            "however",
+            "since",
+            "therefore",
+            "as",
+            "for",
+            "consequently",
+            "hence",
+            "thus",
+            "so",
+            "nevertheless",
+            "yet",
+            "anyway",
+            "still"
+        ]
+    ]))
+
+    words = list(dict.fromkeys(words1))
+
+    print(len(words))
     #words = ["he", "her", "she", "can", "and", "yet", "as", "it", "that", "will"]
     #words = ["the", "a", "hence", "thus", "and", "this", "he", "she", "it", "yet"]
     word_mapping = {word: i for i, word in enumerate(words)} # map words to numbers to sort them later
@@ -630,6 +755,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     # standardise embeddings and transform to numpy arrays
     x_train = np.array(list(zip(*embedding_train))[1])
+    print(embedding_train)
     #x_train = StandardScaler().fit_transform(x_train)
     #x_train = np.array([StandardScaler().fit_transform(np.array(sample).reshape(-1,1)) for sample in x_train], dtype=object).reshape(-1,len(words))
 
@@ -645,9 +771,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     y_dev = np.array(list(zip(*embedding_dev))[0])
 
-    x_train_dft = pd.DataFrame(x_train, columns=words).astype(float)
-    x_test_dft = pd.DataFrame(x_test, columns=words).astype(float)
-    x_dev_dft = pd.DataFrame(x_dev, columns=words).astype(float)
+    x_train_dft = pd.DataFrame(x_train, columns=words).astype("float32")
+    x_test_dft = pd.DataFrame(x_test, columns=words).astype("float32")
+    x_dev_dft = pd.DataFrame(x_dev, columns=words).astype("float32")
 
     y_train_dft = pd.DataFrame(y_train).astype(int)
     y_test_dft = pd.DataFrame(y_test).astype(int)
@@ -738,7 +864,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         def forward(self, x):
             return self.layers(x)
 
-    x_train = np.array(x_train, dtype=float)
+    x_train = np.array(x_train, dtype="float32")
     dataset = TensorDataset(Tensor(x_train), Tensor(y_train))
     trainloader = DataLoader(dataset, batch_size=10, shuffle=True)
 
@@ -773,7 +899,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
             """
     print('Training process has finished.')
 
-    x_test = np.array(x_test, dtype=float)
+    x_test = np.array(x_test, dtype="float32")
     dataset_test = TensorDataset(Tensor(x_test), Tensor(y_test))
 
     pred = []
@@ -810,7 +936,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     word_matrix = [f"{y}/{x}" for y, x in zip(word_stack2, word_stack1)]
     idx_words = word_matrix[0::(len(words)+1)]
     word_matrix_without_diag_flat = np.array([mat for mat in word_matrix if mat not in idx_words])
-    matrix_without_diag_flat_train_df = pd.DataFrame(matrix_without_diag_flat_train, columns=word_matrix_without_diag_flat).astype(float)
+    matrix_without_diag_flat_train_df = pd.DataFrame(matrix_without_diag_flat_train, columns=word_matrix_without_diag_flat).astype("float32")
     x_train_dft = matrix_without_diag_flat_train_df
 
     embedding_test_array = np.array(list(zip(*embedding_test))[1])
@@ -821,7 +947,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     matrix_without_diag_flat_test = np.array([mat[idx] for mat in matrix])
 
-    matrix_without_diag_flat_test_df = pd.DataFrame(matrix_without_diag_flat_test, columns=word_matrix_without_diag_flat).astype(float)
+    matrix_without_diag_flat_test_df = pd.DataFrame(matrix_without_diag_flat_test, columns=word_matrix_without_diag_flat).astype("float32")
     x_test_dft = matrix_without_diag_flat_test_df
 
     embedding_dev_array = np.array(list(zip(*embedding_dev))[1])
@@ -832,7 +958,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     matrix_without_diag_flat_dev = np.array([mat[idx] for mat in matrix])
 
-    matrix_without_diag_flat_dev_df = pd.DataFrame(matrix_without_diag_flat_dev, columns=word_matrix_without_diag_flat).astype(float)
+    matrix_without_diag_flat_dev_df = pd.DataFrame(matrix_without_diag_flat_dev, columns=word_matrix_without_diag_flat).astype("float32")
     x_dev_dft = matrix_without_diag_flat_dev_df
 
     train_data = lgb.Dataset(matrix_without_diag_flat_train, label=y_train)
@@ -865,6 +991,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         def __init__(self):
             super().__init__()
             self.layers = nn.Sequential(
+                nn.Dropout(p=0.3),
                 nn.Linear(matrix_without_diag_flat_train.shape[1], 2),
             )
 
@@ -874,14 +1001,14 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     x_train = matrix_without_diag_flat_train
     dataset = TensorDataset(Tensor(x_train), Tensor(y_train))
-    trainloader = DataLoader(dataset, batch_size=10, shuffle=True)
+    trainloader = DataLoader(dataset, batch_size=64, shuffle=True)
 
     torch.manual_seed(42)
     mlp = MLP()
     loss_function = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(mlp.parameters(), lr=1e-5)
 
-    for epoch in range(15):
+    for epoch in range(3):
         print(f'Starting epoch {epoch+1}')
         current_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -945,9 +1072,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     y_dev = np.array(list(zip(*embedding_dev))[0])
 
-    x_train_dft = pd.DataFrame(x_train, columns=([f"{i}" for i in range(768)] + words)).astype(float)
-    x_test_dft = pd.DataFrame(x_test, columns=([f"{i}" for i in range(768)] + words)).astype(float)
-    x_dev_dft = pd.DataFrame(x_dev, columns=([f"{i}" for i in range(768)] + words)).astype(float)
+    x_train_dft = pd.DataFrame(x_train, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
+    x_test_dft = pd.DataFrame(x_test, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
+    x_dev_dft = pd.DataFrame(x_dev, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
 
     y_train_dft = pd.DataFrame(y_train).astype(int)
     y_test_dft = pd.DataFrame(y_test).astype(int)
@@ -981,9 +1108,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     print(matrix_without_diag_flat_train.shape)
     print(bert_embeddings_train.shape)
     print(word_matrix_without_diag_flat.shape)
-    x_train_dft = pd.DataFrame(x_train, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype(float)
-    x_test_dft = pd.DataFrame(x_test, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype(float)
-    x_dev_dft = pd.DataFrame(x_dev, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype(float)
+    x_train_dft = pd.DataFrame(x_train, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
+    x_test_dft = pd.DataFrame(x_test, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
+    x_dev_dft = pd.DataFrame(x_dev, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
 
     train_data = lgb.Dataset(x_train, label=y_train)
     test_data = lgb.Dataset(x_test, label=y_test)
@@ -1014,11 +1141,11 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 if __name__ == "__main__":
     model_attributes = ModelAttributes("bert-base-uncased")
 
-    load = "./models/loop16"
+    load = "./models/loop19"
     Path(load).mkdir(parents=True, exist_ok=True)
 
     # change this for new models
-    save = "./models/loop16"
+    save = "./models/loop20"
     Path(save).mkdir(parents=True, exist_ok=True)
 
     load_prev = True # further train a previously trained model
@@ -1026,10 +1153,10 @@ if __name__ == "__main__":
     train_on_premise_conclusion = False # train on premise conclusion dataset
     train_on_arg_quality = True # train on arg quality dataset
     pretrain = False # pretrain on chatgpt and argumentsUnits data
-    load_embedding = False # load old embedding or calcualte a new one
+    load_embedding = True # load old embedding or calcualte a new one
     stance = True # stance classification or arg val
     pca = False # visualize with pca
-    baseline = False # baseline classification
+    baseline = True # baseline classification
     calc_bert_embeddings = True # extract embeddings from bert
     load_bert_embeddings = False # load saved bert embeddings
     all_bool_args = load_prev, train, train_on_premise_conclusion, pretrain, train_on_arg_quality, load_embedding, stance, pca, baseline, calc_bert_embeddings, load_bert_embeddings
