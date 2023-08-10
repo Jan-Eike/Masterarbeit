@@ -1,0 +1,27 @@
+print.line.length = 500
+print.align.key = 0
+preserve.key.case = true
+suppress.initial.newline = true
+sort.format = {%N(author)}
+print.parentheses = true
+
+
+% sort order for fields
+sort.order {* = author # title # school # type # year # month # day # journal # booktitle # volume # pages # publisher # adress # url # urlaccessdate # doi}
+
+% Keep DOI entries
+keep.field {doi}
+
+% Remove double braces around titles.
+rewrite.rule { title # "^\{[\{]\([^#]*\)[\}]\}$" # "{\1}" }
+
+
+% Correct page ranges.
+rewrite.rule {pages # "\([0-9]+\) *\(-\|---\) *\([0-9]+\)" = "\1--\3"}
+
+
+% Translate double quotes as delimiters "" by braces {}
+rewrite.rule { "^\"\([^#]*\)\"$" = "{\1}" }
+rewrite.rule { "# \"\([^#]*\)\"$" = "# {\1}" }
+rewrite.rule { "^\"\([^#]*\)\" #" = "{\1} #" }
+rewrite.rule { "# \"\([^#]*\)\" #" = "# {\1} #" }

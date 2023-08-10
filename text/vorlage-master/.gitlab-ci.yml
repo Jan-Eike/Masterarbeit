@@ -1,0 +1,16 @@
+# Repository is private, so are the artifacts.
+# However, if we can abuse the gitlab pages mechanism, we might be able to
+# Link the zip still!
+pages:
+  before_script:
+    - apt update && apt install -y build-essential zip
+  stage: deploy
+  script:
+    - make zip
+    - mkdir public
+    - mv thesis.zip public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
