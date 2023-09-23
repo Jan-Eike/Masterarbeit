@@ -77,8 +77,8 @@ def load_arg_quality(file="data/arg_quality_rank_30k.csv"):
 
     df = df.rename({"stance_WA": "labels"}, axis=1)
     # remove 0 labels
-    df = df[df["labels"] != 0]
-    df["labels"] = df.labels.apply(lambda x: 0 if x == -1 else x)
+    #df = df[df["labels"] != 0]
+    df["labels"] = df.labels.apply(lambda x: 0 if x == -1 else 1 if x == 1 else 2)
     
     train_df = Dataset.from_pandas(df[df["set"] == "train"].drop(["set"], axis=1))
     test_df = Dataset.from_pandas(df[df["set"] == "test"].drop(["set"], axis=1))

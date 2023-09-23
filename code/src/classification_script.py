@@ -83,17 +83,15 @@ def preprocess_logits_for_metrics(logits, labels):
     return logits.argmax(dim=-1)
 
 
-def mean_pooling(model_output, attention_mask):
-    token_embeddings = model_output
-    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-    sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
-    sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-    return sum_embeddings / sum_mask
-
+def mean_pooling(model_output):
+    size = model_output.shape[1]
+    sum_embeddings = torch.sum(model_output, 1)
+    pooled_embeddings = sum_embeddings / size
+    return pooled_embeddings
 
 def extract_bert_embeddings(dataset, tokenizer, model):
     model = model.to("cpu")
-    with ProcessPoolExecutor(max_workers=4) as executor:
+    with ProcessPoolExecutor(max_workers=1) as executor:
         args = ((dataset, tokenizer, model, a) for a in range(len(dataset["text"])))
         sentence_embeddings = list(tqdm(executor.map(extract_bert_embeddings_parallel, args), total=len(dataset["text"]), desc="Calculating BERT Embeddings"))
     sentence_embeddings = np.stack(sentence_embeddings, axis=0)
@@ -105,8 +103,8 @@ def extract_bert_embeddings_parallel(args):
     input = tokenizer(dataset["text"][a], padding=True, truncation=True, max_length=512, return_tensors="pt")
     with torch.no_grad():
         output = model(**input)
-    embedding = mean_pooling(output["hidden_states"][-1], input["attention_mask"]) # mean pooling of all token embeddings
-    #embedding = output["hidden_states"][-1][:,0,:] # CLS token embedding
+    embedding = mean_pooling(output["hidden_states"][-1]) # mean pooling of all token embeddings
+    #embedding = output["hidden_states"][-1][:,0,:] # CLS token embedding   [:,0,:] = (Batch_size, Sequence_length, Hidden_size)
     return  embedding
 
 
@@ -324,23 +322,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         )
         trainer.save_model(output_dir=save)
 
-    # training arguments for all masked LM 
-    training_args = transformers.TrainingArguments(
-        output_dir=save,
-        overwrite_output_dir=False,
-        per_device_train_batch_size=3, # change if not enough cuda memory
-        per_device_eval_batch_size=3, # change if not enough cuda memory
-        num_train_epochs=3,
-        warmup_steps=100,
-        load_best_model_at_end=True,
-        evaluation_strategy=IntervalStrategy.STEPS,
-        eval_steps=1500,
-        save_total_limit=10,
-        metric_for_best_model="eval_loss",
-        eval_accumulation_steps=10,
-        save_steps=1500
-    )
-    
+    # training arguments for all masked LM     
     training_args = transformers.TrainingArguments(
         output_dir=save,
         overwrite_output_dir=False,
@@ -456,6 +438,8 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         baseline_scores = trainer.evaluate(eval_dataset=tokenized_test_arg_quality)
         print(baseline_scores)
         trainer.save_model(output_dir=save+"/LM_classification")
+
+    model_class = BertForSequenceClassification.from_pretrained(load + "/LM_classification", num_labels=2, output_hidden_states=True).to(DEVICE)
 
     model_class = model_class.to("cpu") if model_class is not None else model.to("cpu")
     model = model.to("cpu")
@@ -723,19 +707,13 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         bert_embeddings_train = np.load(load + '/bert_embeddings_train.npy', allow_pickle=True)
         bert_embeddings_test = np.load(load + '/bert_embeddings_test.npy', allow_pickle=True)
         bert_embeddings_dev = np.load(load + '/bert_embeddings_dev.npy', allow_pickle=True)
-        np.save(save + '/bert_embeddings_train.npy', bert_embeddings_train, allow_pickle=True)
-        np.save(save + '/bert_embeddings_test.npy', bert_embeddings_test, allow_pickle=True)
-        np.save(save + '/bert_embeddings_dev.npy', bert_embeddings_dev, allow_pickle=True)
     elif calc_bert_embeddings:
         bert_embeddings_train = extract_bert_embeddings(train_arg_quality, tokenizer, model_class)
         bert_embeddings_test = extract_bert_embeddings(test_arg_quality, tokenizer, model_class)
         bert_embeddings_dev = extract_bert_embeddings(dev_arg_quality, tokenizer, model_class)
-        print(bert_embeddings_train.shape)
-        print(bert_embeddings_test.shape)
-        print(bert_embeddings_dev.shape)
-        np.save(save + '/bert_embeddings_train.npy', bert_embeddings_train, allow_pickle=True)
-        np.save(save + '/bert_embeddings_test.npy', bert_embeddings_test, allow_pickle=True)
-        np.save(save + '/bert_embeddings_dev.npy', bert_embeddings_dev, allow_pickle=True)
+    np.save(save + '/bert_embeddings_train.npy', bert_embeddings_train, allow_pickle=True)
+    np.save(save + '/bert_embeddings_test.npy', bert_embeddings_test, allow_pickle=True)
+    np.save(save + '/bert_embeddings_dev.npy', bert_embeddings_dev, allow_pickle=True)
 
     if load_embedding:
         embedding_train = np.load(load + '/embedding_train.npy', allow_pickle=True)
@@ -752,6 +730,8 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     np.save(save + '/embedding_train.npy', embedding_train, allow_pickle=True)
     np.save(save + '/embedding_test.npy', embedding_test, allow_pickle=True)
     np.save(save + '/embedding_dev.npy', embedding_dev, allow_pickle=True)
+
+    print(bert_embeddings_train.shape, np.array(list(zip(*embedding_train))[1]).shape)
 
     # standardise embeddings and transform to numpy arrays
     x_train = np.array(list(zip(*embedding_train))[1])
@@ -822,19 +802,6 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     f1_lgbm = f1_score(y_test, (np.round(ypred)), average='macro')
     print(f1_lgbm)
 
-    # svm classification
-    clf = svm.SVC(kernel="poly")
-    clf.fit(x_train, y_train)
-
-    ypred_svm = clf.predict(x_test)
-    print(f1_score(y_test, ypred_svm, average='macro'))
-
-    clf = svm.SVC(kernel="rbf")
-    clf.fit(x_train, y_train)
-
-    ypred_svm = clf.predict(x_test)
-    f1_svm = f1_score(y_test, ypred_svm, average='macro')
-    print(f1_svm)
     # pca visualization
     if pca:
         pca = PCA(n_components=2)
@@ -926,7 +893,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     # this yields precentage deviation instead of pure probabilities
     matrix = (embedding_train_array[...,None]*(1/embedding_train_array[:,None]))
     #matrix = (embedding_complete_array[...,None]*(1/embedding_complete_array[:,None]))
-    idx = np.where(~np.eye(matrix[0].shape[0],dtype=bool))
+    idx = np.where(~np.eye(matrix[0].shape[0], dtype=bool))
 
     matrix_without_diag_flat_train = np.array([mat[idx] for mat in matrix])
 
@@ -991,13 +958,13 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         def __init__(self):
             super().__init__()
             self.layers = nn.Sequential(
-                nn.Dropout(p=0.3),
+                nn.Dropout(p=0.1),
                 nn.Linear(matrix_without_diag_flat_train.shape[1], 2),
             )
 
 
         def forward(self, x):
-            return self.layers(x)
+            return torch.nn.functional.log_softmax(self.layers(x), dim=1)
 
     x_train = matrix_without_diag_flat_train
     dataset = TensorDataset(Tensor(x_train), Tensor(y_train))
@@ -1099,15 +1066,104 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     f1_lgbm_best_combined = f1_score(y_test_dft, (np.round(ypred)), average='macro')
     print(f"f1_lgbm: {f1_lgbm_best_combined}")
 
-    print(matrix_without_diag_flat_train.shape)
-    print(bert_embeddings_train.shape)
+    x_train_dft = pd.DataFrame(bert_embeddings_train, columns=[f"{i}" for i in range(768)]).astype("float32")
+    x_test_dft = pd.DataFrame(bert_embeddings_test, columns=[f"{i}" for i in range(768)]).astype("float32")
+    x_dev_dft = pd.DataFrame(bert_embeddings_dev, columns=[f"{i}" for i in range(768)]).astype("float32")
+
+    y_train_dft = pd.DataFrame(y_train).astype(int)
+    y_test_dft = pd.DataFrame(y_test).astype(int)
+    y_dev_dft = pd.DataFrame(y_dev).astype(int)
+
+    # lgbm classification
+    train_data = lgb.Dataset(x_train, label=y_train)
+    test_data = lgb.Dataset(x_test, label=y_test)
+    validation_data = lgb.Dataset(x_dev, label=y_dev)
+
+    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
+
+    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
+    f1_lgbm_BERT = f1_score(y_test_dft, (np.round(ypred)), average='macro')
+    print(f"f1_lgbm_WARNUNG222: {f1_lgbm_BERT}")
+
+    x_train_dft, x_test_dft, x_dev_dft = feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params)
+
+    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
+
+    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
+    f1_lgbm_best_BERT = f1_score(y_test_dft, (np.round(ypred)), average='macro')
+    print(f"f1_lgbm222: {f1_lgbm_best_BERT}")
+
+    class MLP(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layers = nn.Sequential(
+                nn.Dropout(p=0.1),
+                nn.Linear(bert_embeddings_train.shape[1], 2),
+            )
+
+
+        def forward(self, x):
+            return torch.nn.functional.log_softmax(self.layers(x), dim=1)
+
+    x_train = bert_embeddings_train
+    dataset = TensorDataset(Tensor(x_train), Tensor(y_train))
+    trainloader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+    torch.manual_seed(42)
+    mlp = MLP()
+    loss_function = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(mlp.parameters(), lr=1e-5)
+
+    for epoch in range(3):
+        print(f'Starting epoch {epoch+1}')
+        current_loss = 0.0
+        for i, data in enumerate(trainloader, 0):
+            
+            inputs, targets = data
+            targets = targets.long()
+            
+            optimizer.zero_grad()
+            
+            outputs = mlp(inputs)
+            
+            loss = loss_function(outputs, targets)
+            
+            loss.backward()
+            
+            optimizer.step()
+            
+            current_loss += loss.item()
+            """
+            if i % 50 == 49:
+                print('Loss after mini-batch %5d: %.3f' %
+                    (i + 1, current_loss / 50))
+                current_loss = 0.0
+            """
+    print('Training process has finished.')
+
+    x_test = bert_embeddings_test
+    dataset_test = TensorDataset(Tensor(x_test), Tensor(y_test))
+
+    pred = []
+    testloader = DataLoader(dataset_test, batch_size=10, shuffle=False)
+    with torch.no_grad():
+        for i, data in enumerate(testloader, 0):
+
+            inputs, targets = data
+            targets = targets.long()
+
+            outputs = mlp(inputs)
+
+            _, predicted = torch.max(outputs, 1)
+            pred.extend(predicted.tolist())
+
+    f1_BERT_nn = f1_score(y_test, pred, average='macro')
+    print("BERT_nn:",f1_BERT_nn)
+
     x_train = np.concatenate((bert_embeddings_train, matrix_without_diag_flat_train), axis=1)
     x_test = np.concatenate((bert_embeddings_test, matrix_without_diag_flat_test), axis=1)
     x_dev = np.concatenate((bert_embeddings_dev, matrix_without_diag_flat_dev), axis=1)
-    print(x_train.shape)
-    print(matrix_without_diag_flat_train.shape)
-    print(bert_embeddings_train.shape)
-    print(word_matrix_without_diag_flat.shape)
+
     x_train_dft = pd.DataFrame(x_train, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
     x_test_dft = pd.DataFrame(x_test, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
     x_dev_dft = pd.DataFrame(x_dev, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
@@ -1130,7 +1186,24 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     f1_lgbm_best_combined_matrix = f1_score(y_test_dft, (np.round(ypred)), average='macro')
     print(f"f1_lgbm: {f1_lgbm_best_combined_matrix}")
 
-    final_scores = {"f1_lgbm": f1_lgbm, "f1_svm": f1_svm, "f1_nn": f1_nn, "f1_matrix_lgbm": f1_matrix_lgbm, "f1_matrix_nn": f1_matrix_nn, "f1_lgbm_best_select": f1_lgbm_best, "f1_lgbm_best_matrix": f1_lgbm_best_matrix, "f1_lgbm_combined": f1_lgbm_combined, "f1_lgbm_best_combined": f1_lgbm_best_combined, "baseline_scores": baseline_scores, "f1_lgbm_combined_matrix": f1_lgbm_combined_matrix, "f1_lgbm_best_combined_matrix": f1_lgbm_best_combined_matrix}
+    
+
+    final_scores = {
+        "f1_lgbm": f1_lgbm,
+        "f1_nn": f1_nn, 
+        "f1_matrix_lgbm": f1_matrix_lgbm, 
+        "f1_matrix_nn": f1_matrix_nn, 
+        "f1_lgbm_best_select": f1_lgbm_best, 
+        "f1_lgbm_best_matrix": f1_lgbm_best_matrix, 
+        "f1_lgbm_combined": f1_lgbm_combined, 
+        "f1_lgbm_best_combined": f1_lgbm_best_combined, 
+        "baseline_scores": baseline_scores, 
+        "f1_lgbm_combined_matrix": f1_lgbm_combined_matrix, 
+        "f1_lgbm_best_combined_matrix": f1_lgbm_best_combined_matrix,
+        "f1_lgbm_best_BERT": f1_lgbm_best_BERT,
+        "f1_lgbm_BERT": f1_lgbm_BERT,
+        "f1_BERT_nn": f1_BERT_nn
+    }
     print(final_scores)
     with open(save + "/scores.json", "w", encoding="utf8") as f:
         json.dump(final_scores, f)
@@ -1141,25 +1214,27 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 if __name__ == "__main__":
     model_attributes = ModelAttributes("bert-base-uncased")
 
-    load = "./models/loop19"
+    load = "./models/loop20"
     Path(load).mkdir(parents=True, exist_ok=True)
 
-    # change this for new models
-    save = "./models/loop20"
-    Path(save).mkdir(parents=True, exist_ok=True)
-
-    load_prev = True # further train a previously trained model
-    train = False # train model or use a saved one. If this is False, load_prev is always True
+    load_prev = False # further train a previously trained model
+    train = True # train model or use a saved one. If this is False, load_prev is always True
     train_on_premise_conclusion = False # train on premise conclusion dataset
     train_on_arg_quality = True # train on arg quality dataset
     pretrain = False # pretrain on chatgpt and argumentsUnits data
-    load_embedding = True # load old embedding or calcualte a new one
+    load_embedding = False # load old embedding or calcualte a new one
     stance = True # stance classification or arg val
     pca = False # visualize with pca
     baseline = True # baseline classification
     calc_bert_embeddings = True # extract embeddings from bert
     load_bert_embeddings = False # load saved bert embeddings
     all_bool_args = load_prev, train, train_on_premise_conclusion, pretrain, train_on_arg_quality, load_embedding, stance, pca, baseline, calc_bert_embeddings, load_bert_embeddings
+    
+    save_suffix = "".join([str(int(i)) for i in all_bool_args])
+    save = "./models/run_1_config_" + save_suffix
+    print(save)
+
+    Path(save).mkdir(parents=True, exist_ok=True)
 
     scores = []
     for i in range(1):
