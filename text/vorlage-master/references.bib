@@ -1,9 +1,18 @@
-@misc{argsvalidnovel2022,
-  Author       = {Philipp Heinisch},
-  Title        = {Shared task on predicting validity and novelty of arguments},
-  Year         = 2022,
-  howpublished = "\url{https://phhei.github.io/ArgsValidNovel/}",
-  note         = {accessed 12-August-2023}
+@inproceedings{argsvalidnovel2022,
+    title = "Overview of the 2022 Validity and Novelty Prediction Shared Task",
+    author = "Heinisch, Philipp  and
+      Frank, Anette  and
+      Opitz, Juri  and
+      Plenz, Moritz  and
+      Cimiano, Philipp",
+    booktitle = "Proceedings of the 9th Workshop on Argument Mining",
+    month = oct,
+    year = "2022",
+    address = "Online and in Gyeongju, Republic of Korea",
+    publisher = "International Conference on Computational Linguistics",
+    url = "https://aclanthology.org/2022.argmining-1.7",
+    pages = "84--94",
+    abstract = "This paper provides an overview of the Argument Validity and Novelty Prediction Shared Task that was organized as part of the 9th Workshop on Argument Mining (ArgMining 2022). The task focused on the prediction of the validity and novelty of a conclusion given a textual premise. Validity is defined as the degree to which the conclusion is justified with respect to the given premise. Novelty defines the degree to which the conclusion contains content that is new in relation to the premise. Six groups participated in the task, submitting overall 13 system runs for the subtask of binary classification and 2 system runs for the subtask of relative classification. The results reveal that the task is challenging, with best results obtained for Validity prediction in the range of 75{\%} F1 score, for Novelty prediction of 70{\%} F1 score and for correctly predicting both Validity and Novelty of 45{\%} F1 score. In this paper we summarize the task definition and dataset. We give an overview of the results obtained by the participating systems, as well as insights to be gained from the diverse contributions.",
 }
 
 @article{mohammad2017stance,
@@ -78,18 +87,25 @@
  year = {2017}
 }
 
-@article{xgboost,
-  author       = {Tianqi Chen and
-                  Carlos Guestrin},
-  title        = {XGBoost: {A} Scalable Tree Boosting System},
+@misc{lgbmpython,
+	author={Microsoft},
+	title={LightGBM},
+	howpublished={\url{https://lightgbm.readthedocs.io/en/latest/Python-Intro.html}},
+	note={accessed 22-October-2023; Python package for LightGBM.}
+}
+
+@article{shap,
+  author       = {Scott M. Lundberg and
+                  Su{-}In Lee},
+  title        = {A unified approach to interpreting model predictions},
   journal      = {CoRR},
-  volume       = {abs/1603.02754},
-  year         = {2016},
-  url          = {http://arxiv.org/abs/1603.02754},
+  volume       = {abs/1705.07874},
+  year         = {2017},
+  url          = {http://arxiv.org/abs/1705.07874},
   eprinttype    = {arXiv},
-  eprint       = {1603.02754},
-  timestamp    = {Sat, 17 Dec 2022 01:15:28 +0100},
-  biburl       = {https://dblp.org/rec/journals/corr/ChenG16.bib},
+  eprint       = {1705.07874},
+  timestamp    = {Fri, 26 Nov 2021 16:33:36 +0100},
+  biburl       = {https://dblp.org/rec/journals/corr/LundbergL17.bib},
   bibsource    = {dblp computer science bibliography, https://dblp.org}
 }
 
@@ -141,7 +157,8 @@
 }
 
 @misc{ibm,
-  titel = {Project Debater Datasets},
+  author = {IBM},
+  title = {Project Debater Datasets},
   howpublished={\url{https://research.ibm.com/haifa/dept/vst/debating_data.shtml#Argument_Quality}},
   note={accessed 16-August-2023}
 }
@@ -170,19 +187,44 @@
 @misc{bertmask,
   author={Huggingface},
   title={BERT},
-  howbublished={\url{https://huggingface.co/docs/transformers/v4.32.1/en/model_doc/bert#transformers.BertForMaskedLM}},
+  howpublished={\url{https://huggingface.co/docs/transformers/v4.32.1/en/model_doc/bert#transformers.BertForMaskedLM}},
   note={accessed 30-August-2023}
 }
 
   
-@inproceedings{bertimpl,
-author = {Wolf, Thomas and Debut, Lysandre and Sanh, Victor and Chaumond, Julien and Delangue, Clement and Moi, Anthony and Cistac, Perric and Ma, Clara and Jernite, Yacine and Plu, Julien and Xu, Canwen and Le Scao, Teven and Gugger, Sylvain and Drame, Mariama and Lhoest, Quentin and Rush, Alexander M.},
-month = oct,
-pages = {38--45},
-publisher = {Association for Computational Linguistics},
-title = {{Transformers: State-of-the-Art Natural Language Processing}},
-url = {https://www.aclweb.org/anthology/2020.emnlp-demos.6},
-year = {2020}
+@misc{bertimpl,
+    title = "Transformers: State-of-the-Art Natural Language Processing",
+    author = "Wolf, Thomas  and
+      Debut, Lysandre  and
+      Sanh, Victor  and
+      Chaumond, Julien  and
+      Delangue, Clement  and
+      Moi, Anthony  and
+      Cistac, Pierric  and
+      Rault, Tim  and
+      Louf, Remi  and
+      Funtowicz, Morgan  and
+      Davison, Joe  and
+      Shleifer, Sam  and
+      von Platen, Patrick  and
+      Ma, Clara  and
+      Jernite, Yacine  and
+      Plu, Julien  and
+      Xu, Canwen  and
+      Le Scao, Teven  and
+      Gugger, Sylvain  and
+      Drame, Mariama  and
+      Lhoest, Quentin  and
+      Rush, Alexander",
+    booktitle = "Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing: System Demonstrations",
+    month = oct,
+    year = "2020",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    howpublished = {\url{https://aclanthology.org/2020.emnlp-demos.6}},
+    doi = "\url{10.18653/v1/2020.emnlp-demos.6}",
+    pages = "38--45",
+    abstract = "Recent progress in natural language processing has been driven by advances in both model architecture and model pretraining. Transformer architectures have facilitated building higher-capacity models and pretraining has made it possible to effectively utilize this capacity for a wide variety of tasks. Transformers is an open-source library with the goal of opening up these advances to the wider machine learning community. The library consists of carefully engineered state-of-the art Transformer architectures under a unified API. Backing this library is a curated collection of pretrained models made by and available for the community. Transformers is designed to be extensible by researchers, simple for practitioners, and fast and robust in industrial deployments. The library is available at \url{https://github.com/huggingface/transformers}.",
 }
 
 @misc{lgbmimportance,
@@ -190,4 +232,100 @@ year = {2020}
 	title={LightGBM Feature Importance},
 	howpublished={\url{https://github.com/microsoft/LightGBM/blob/master/python-package/lightgbm/basic.py\#L4491}},
 	note={accessed 19-September-2023; Method for feature importance}
+}
+
+@article{Discours1999,
+title = {What are discourse markers?},
+journal = {Journal of Pragmatics},
+volume = {31},
+number = {7},
+pages = {931-952},
+year = {1999},
+note = {Pragmatics: The Loaded Discipline?},
+issn = {0378-2166},
+doi = {https://doi.org/10.1016/S0378-2166(98)00101-5},
+url = {https://www.sciencedirect.com/science/article/pii/S0378216698001015},
+author = {Bruce Fraser},
+abstract = {This paper is an attempt to clarify the status of discourse markers. These lexical expressions have been studied under various labels, including discourse markers, discourse connectives, discourse operators, pragmatic connectives, sentence connectives, and cue phrases. Although most researchers agree that they are expressions which relate discourse segments, there is no agreement on how they are to be defined or how they function. After reviewing prior theoretical research, I define discourse markers as a class of lexical expressions drawn primarily from the syntactic classes of conjunctions, adverbs, and prepositional phrases. With certain exceptions, they signal a relationship between the interpretation of the segment they introduce, S2, and the prior segment, S1. They have a core meaning, which is procedural, not conceptual, and their more specific interpretation is ‘negotiated’ by the context, both linguistic and conceptual. There are two types: those that relate the explicit interpretation conveyed by S2 with some aspect associated with the segment, S1; and those that relate the topic of S2 to that of S1. I conclude by presenting what appears to be the major classes according to their function.}
+}
+
+@misc{bertexample,
+	author={Huggingface},
+	title={bert-base-uncased},
+	howpublished={\url{https://huggingface.co/bert-base-uncased?text=Berlin+is+the+capital+of+%5BMASK%5D.}},
+	note={accessed 22-October-2023; Example for BERT masking.}
+}
+
+@misc{bertexample2,
+	author={Huggingface},
+	title={bert-base-uncased},
+	howpublished={\url{https://huggingface.co/bert-base-uncased?text=Pizza+tastes+good%2C+%5BMASK%5D+it%27s+one+of+the+most+liked+foods+in+the+world.}},
+	note={accessed 22-October-2023; Second example for BERT masking.}
+}
+
+@misc{bertbaseuncased,
+	author={Huggingface},
+	title={bert-base-uncased},
+	howpublished={\url{https://huggingface.co/bert-base-uncased}},
+	note={accessed 22-October-2023; BERT-base-uncased model from huggingface.}
+}
+
+@article{gpt3,
+  author       = {Tom B. Brown and
+                  Benjamin Mann and
+                  Nick Ryder and
+                  Melanie Subbiah and
+                  Jared Kaplan and
+                  Prafulla Dhariwal and
+                  Arvind Neelakantan and
+                  Pranav Shyam and
+                  Girish Sastry and
+                  Amanda Askell and
+                  Sandhini Agarwal and
+                  Ariel Herbert{-}Voss and
+                  Gretchen Krueger and
+                  Tom Henighan and
+                  Rewon Child and
+                  Aditya Ramesh and
+                  Daniel M. Ziegler and
+                  Jeffrey Wu and
+                  Clemens Winter and
+                  Christopher Hesse and
+                  Mark Chen and
+                  Eric Sigler and
+                  Mateusz Litwin and
+                  Scott Gray and
+                  Benjamin Chess and
+                  Jack Clark and
+                  Christopher Berner and
+                  Sam McCandlish and
+                  Alec Radford and
+                  Ilya Sutskever and
+                  Dario Amodei},
+  title        = {Language Models are Few-Shot Learners},
+  journal      = {CoRR},
+  volume       = {abs/2005.14165},
+  year         = {2020},
+  url          = {https://arxiv.org/abs/2005.14165},
+  eprinttype    = {arXiv},
+  eprint       = {2005.14165},
+  timestamp    = {Thu, 25 May 2023 10:38:31 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-2005-14165.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+
+@article{bertexplain,
+  author       = {Ian Tenney and
+                  Dipanjan Das and
+                  Ellie Pavlick},
+  title        = {{BERT} Rediscovers the Classical {NLP} Pipeline},
+  journal      = {CoRR},
+  volume       = {abs/1905.05950},
+  year         = {2019},
+  url          = {http://arxiv.org/abs/1905.05950},
+  eprinttype    = {arXiv},
+  eprint       = {1905.05950},
+  timestamp    = {Tue, 28 May 2019 12:48:08 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/abs-1905-05950.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
 }

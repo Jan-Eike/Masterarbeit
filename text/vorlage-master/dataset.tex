@@ -16,7 +16,7 @@ The dataset for validity classification is taken from the shared task on predict
 		\item[-] Label -1: Conclusion is invalid.
 	\end{enumerate}
 \end{enumerate}
-The data is already split in train, dev and test datasets, with a ratio of roughly $0.5$, $0.15$, $0.35$ and the dev and test set do not share the same topics with the train set. In the training set, about $53\%$ of the data has the validity label 1 and in both dev and test set about $60\%$.
+The data is already split in train, dev and test datasets, with a ratio of roughly $0.5$, $0.15$, $0.35$ and a total of $1472$ data points all in English language. The topics are mostly political, e.g. regarding Torture, 9/11 terror suspects or Turkey EU membership. A few topics are about social subjects, like Vegetarianism. A complete list of topics can be found in the appendix. All the conclusions are automatically generated and presented to human annotators \cite{argsvalidnovel2022}. The dev and test set do not share the same topics with the train set. In the training set, about $53\%$ of the data has the validity label 1 and in both dev and test set about $60\%$.
 
 \subsection{Stance Dataset}
 
@@ -30,24 +30,28 @@ The dataset for stance classification is taken from the the IBM project debater 
 		\item[-] Label -1: Negative stance.
 	\end{enumerate}
 \end{enumerate}
-The data is split with a ratio of about $0.7$, $0.2$, $0.1$ in train, dev and test data. Both labels roughly have a $50\%$ probability of occurrence.
+The data is split with a ratio of about $0.7$, $0.2$, $0.1$ in train, dev and test data with a total of $30,497$ data points all in English language. Both labels roughly have a $50\%$ probability of occurrence. The topics in this dataset vary across a wide variety of subjects and each topic has at most $6$ arguments \cite{stancedata} but most of the time just one. \\
+We decided to use another dataset besides the validity dataset since it only consists of $1472$ data points which is a comparably small number for deep learning tasks.
 
-\subsection{Additional Data}
+\subsection{Data Augmentation}
 
-Since not a lot of samples from both datasets, do not include conclusions or arguments that start with linking word, we decided to pretrain our models on artificially created data that explicitly uses linking words. To generate this data, we used ChatGPT \cite{chatgpt}, using prompts of the form
+Since not a lot of samples from both datasets include conclusions or arguments that start with linking words, we decided to pretrain our models on artificially created data that explicitly uses linking words. To generate this data, we used ChatGPT \cite{chatgpt} which is a chat bot that can create human like text given user input prompts. We are using prompts of the form
 \begin{center}
 	\textit{give me ten arguments consisting of multiple sentences and a conclusion that is indicated with <linking word>}.
 \end{center}
 
-Where we replace <linking word> with each of the linking words, we decided to use. 
+Where we replace <linking word> with each of the linking words, we decided to use. We used the linking words "Thus", "Therefore", "So", "Hence" and "Consequently" to generate 40 data points each.
+\begin{center}
+	"Argument about the dangers of smoking: Smoking is a leading cause of preventable deaths, damaging nearly every organ in the body. Hence, it is essential to understand the health risks associated with smoking and to avoid it."
+\end{center}
 
 \subsection{Preprocessing}
 
 Besides the standard BERT preprocessing which consists of splitting strings in sub-word tokens and converting these strings to ids \cite{bertprepro}, we decided to combine all the different columns of the datasets that contain text (e.g. Premise, Conclusion) into one column in the following way:
 \begin{enumerate}
-	\item Add markers to the start of each column: <\_t> for the topic column, <\_p> for the premise column, <\_c> for the conclusion or argument column.
-	\item Concatenate the columns to one text column.
-	\item Add punctuation between the columns.
+	\item Add markers to the start of each column: For validity classification, we add <\_t> for the topic column, <\_p> for the premise column, <\_c> for the conclusion column. For stance detection, we add <\_t> for the topic column and <\_c> for the argument column. These markers are mainly added to determine the positions at which the [MASK] tokens will be included.
+	\item Concatenate the columns to one text column. This is done to create one input text for our LMs since we are interested in all the context around the masked token and not at predicting the entire next sentence.
+	\item Add punctuation between the columns since LMs tend to change probabilities based on the position in the sentence (Is the [MASK] token after a comma or at the beginning of a new sentence?).
 \end{enumerate}
 
 After preprocessing, one data point looks like this:

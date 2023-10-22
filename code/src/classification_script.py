@@ -1,25 +1,23 @@
 import transformers
 import torch
 import json
+import configparser
 import numpy as np
 import lightgbm as lgb
 import pandas as pd
-import matplotlib.pyplot as plt
 from pathlib import Path
 from datasets import Dataset, DatasetDict
 from torch import nn, Tensor
 from torch.utils.data import DataLoader, TensorDataset
 from model_attributes import ModelAttributes
 from tqdm import tqdm
-from sklearn import svm
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
+from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from sklearn.model_selection import RepeatedKFold
 from sklearn.metrics import mean_squared_error
 from concurrent.futures import ProcessPoolExecutor
+from classifier import Classifier
 from transformers import (
     DataCollatorForLanguageModeling,
     IntervalStrategy, 
@@ -39,12 +37,13 @@ DEVICE = "cuda:0"
 def load_all_datasets():
     # load premise conclusion data
     train_dataset, test_dataset, val_dataset = load_data(["data/TaskA_train.csv", "data/TaskA_test.csv", "data/TaskA_dev.csv"])
-    train_dataset_for_complete = train_dataset.to_pandas()
-    test_dataset_for_complete = test_dataset.to_pandas()
-    val_dataset_for_complete = val_dataset.to_pandas()
-    complete_dataset = Dataset.from_pandas(pd.concat([train_dataset_for_complete, test_dataset_for_complete, val_dataset_for_complete], ignore_index=True))
+    #train_dataset_for_complete = train_dataset.to_pandas()
+    #test_dataset_for_complete = test_dataset.to_pandas()
+    #val_dataset_for_complete = val_dataset.to_pandas()
+    #complete_dataset = Dataset.from_pandas(pd.concat([train_dataset_for_complete, test_dataset_for_complete, val_dataset_for_complete], ignore_index=True))
 
-    premise_conclusion_data = complete_dataset
+    #premise_conclusion_data = complete_dataset
+    premise_conclusion_data = train_dataset, test_dataset, val_dataset
 
     # load pretraining data
     pretraining_data = load_pretraining_data()
@@ -124,7 +123,6 @@ def calculate_embedding_vector(dataset, tokenizer, model, words, word_mapping):
         # as first word in the conclusion for each sentence
         sentence_probs = []
         for sentence in sentences[1:]:
-            probs_each = []
             # insert mask token at the beginning of the conclusion
             text = topic + "." + sentence + ", " + conclusion.replace("<_c>", "<_c> " + model_attributes.mask)
             
@@ -137,10 +135,14 @@ def calculate_embedding_vector(dataset, tokenizer, model, words, word_mapping):
             masked_words_name = torch.sort(mask_token_logits, descending=True)[0]
             masked_words_id = torch.sort(mask_token_logits, descending=True)[1]
 
+            probs_each = []
+            checked_words = [] # depending on the model, some words appear in different cases
             # append the probability of each linking word for the current sentence to a list
             for i, masked_word in enumerate(masked_words_id):
-                if tokenizer.decode(masked_word).lower() in words:
-                    probs_each.append((label, tokenizer.decode(masked_word), torch.nn.functional.softmax(masked_words_name, dim=-1)[i].item()))
+                current_word = tokenizer.decode(masked_word).lower()
+                if current_word in words and current_word not in checked_words:
+                    checked_words.append(current_word)
+                    probs_each.append((label, current_word, torch.nn.functional.softmax(masked_words_name, dim=-1)[i].item()))
 
             sentence_probs.append(probs_each)
         
@@ -148,7 +150,7 @@ def calculate_embedding_vector(dataset, tokenizer, model, words, word_mapping):
         probs.append(max(sentence_probs, key=lambda x: x[2]))
     
     # sort probabilities with the word mapping order to always keep the same ordering
-    probs_sorted = [sorted(x, key=lambda x: word_mapping[x[1]]) for x in probs]
+    probs_sorted = [sorted(x, key=lambda x: word_mapping[x[1].lower()]) for x in probs]
 
     # build the final embedding as list of (label, embedding vector) tuples
     embedding = [(np.int_(data_point[0,0]), np.float_(data_point[:, 2])) for data_point in np.array(probs_sorted)]
@@ -162,7 +164,7 @@ def calculate_embedding_vector_stance(dataset, tokenizer, model, words, word_map
         probs = list(tqdm(executor.map(calculate_embedding_vector_stance_parallel, args), total=len(dataset["text"])))
 
     # sort probabilities with the word mapping order to always keep the same ordering
-    probs_sorted = [sorted(x, key=lambda x: word_mapping[x[1]]) for x in probs]
+    probs_sorted = [sorted(x, key=lambda x: word_mapping[x[1].lower()]) for x in probs]
 
     # build the final embedding as list of (label, embedding vector) tuples
     embedding = [(np.int_(data_point[0,0]), np.float_(data_point[:, 2])) for data_point in np.array(probs_sorted)]
@@ -187,10 +189,13 @@ def calculate_embedding_vector_stance_parallel(args):
     masked_words_id = torch.sort(mask_token_logits, descending=True)[1]
 
     probs_each = []
+    checked_words = [] # depending on the model, some words appear in different cases
     # append the probability of each linking word for the current sentence to a list
     for i, masked_word in enumerate(masked_words_id):
-        if tokenizer.decode(masked_word).lower() in words:
-            probs_each.append((label, tokenizer.decode(masked_word), torch.nn.functional.softmax(masked_words_name, dim=-1)[i].item()))
+        current_word = tokenizer.decode(masked_word).lower()
+        if current_word in words and current_word not in checked_words:
+            checked_words.append(current_word)
+            probs_each.append((label, current_word, torch.nn.functional.softmax(masked_words_name, dim=-1)[i].item()))
     return probs_each
 
 
@@ -245,10 +250,7 @@ def feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params):
     #print(len(features))
     #print(features)
 
-    print(y_train_dft)
-    print(x_train_dft)
     x_train_dft = x_train_dft[features]
-    print(x_train_dft)
     x_test_dft = x_test_dft[features]
     x_dev_dft = x_dev_dft[features]
 
@@ -276,8 +278,32 @@ def train_test_dev_split(data, train_size=0.8):
     return train_dev_test['train'], train_dev_test['test'], train_dev_test['dev']
 
 
+def create_word_matrix_idx(words):
+    # create the same array but for the words themselves (-> used as naming scheme for importance)
+    word_stack1 = [w for _ in range(len(words)) for w in words]
+    word_stack2 = [w for w in words for _ in range(len(words))]
+    word_matrix = [f"{y}/{x}" for y, x in zip(word_stack2, word_stack1)]
+    idx_words = word_matrix[0::(len(words)+1)]
+    word_matrix_without_diag_flat = np.array([mat for mat in word_matrix if mat not in idx_words])
+    return word_matrix_without_diag_flat
+
+
+def create_matrix_embedding(embedding, words):
+    # multiply the probability of each word with all the inverse probabilities of the other words and remove the diagonal
+    # this yields precentage deviation instead of pure probabilities
+    matrix = (embedding[...,None]*(1/embedding[:,None]))
+    idx = np.where(~np.eye(matrix[0].shape[0], dtype=bool))
+    matrix_embedding = np.array([mat[idx] for mat in matrix])
+
+    word_matrix_without_diag_flat = create_word_matrix_idx(words)
+
+    matrix_embedding_df = pd.DataFrame(matrix_embedding, columns=word_matrix_without_diag_flat).astype("float32")
+
+    return matrix_embedding, matrix_embedding_df
+
+
 def train_loop(save_i, model_attributes, load, save, all_bool_args):
-    load_prev, train, train_on_premise_conclusion, pretrain, train_on_arg_quality, load_embedding, stance, pca, baseline, calc_bert_embeddings, load_bert_embeddings = all_bool_args
+    load_prev, train, train_on_premise_conclusion, train_on_arg_quality, pretrain, load_embedding, stance, baseline, calc_bert_embeddings, load_bert_embeddings = all_bool_args
     # save location for each loop
     save = save + f"/{save_i}"
     load = load + f"/{save_i}"
@@ -292,13 +318,12 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data = load_all_datasets()
     # split data
-    premise_conclusion_train, premise_conclusion_test, premise_conclusion_dev = train_test_dev_split(premise_conclusion_data)
+    #premise_conclusion_train, premise_conclusion_test, premise_conclusion_dev = train_test_dev_split(premise_conclusion_data)
+    premise_conclusion_train, premise_conclusion_test, premise_conclusion_dev = premise_conclusion_data
     train_pre_dataset, test_pre_dataset = train_test_split_custom(pretraining_data)
     train_pre_chatgpt_dataset, test_pre_chatgpt_dataset = train_test_split_custom(chatGPT_data)
     #train_arg_quality, test_arg_quality, dev_arg_quality = train_test_dev_split(arg_quality_data)
     train_arg_quality, test_arg_quality, dev_arg_quality = arg_quality_data
-    for l in arg_quality_data:
-        print(l.shape)
     # tokenize premise conclusion data
     tokenized_train = premise_conclusion_train.map(tokenize_function, batched=True)
     tokenized_test = premise_conclusion_test.map(tokenize_function, batched=True)
@@ -374,7 +399,6 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     from_dir = save if saved else load if load_prev else model_attributes.model_checkpoint
     if train and train_on_premise_conclusion:
         model = AutoModelForMaskedLM.from_pretrained(from_dir, output_hidden_states=True).to(DEVICE) # don't know if necessary
-        print(model.hidden_size)
         trainer = transformers.Trainer(
             model=model,
             train_dataset=tokenized_train,
@@ -421,38 +445,29 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
             warmup_steps=100,
             load_best_model_at_end=True,
             evaluation_strategy=IntervalStrategy.STEPS,
-            eval_steps=150,
+            eval_steps=30, # 150
             save_total_limit=10,
-            save_steps=150
+            save_steps=30 # 150
         )
         trainer = transformers.Trainer(
             model=model_class,
-            train_dataset=tokenized_train_arg_quality,
-            eval_dataset=tokenized_dev_arg_quality,
+            train_dataset=tokenized_train,
+            eval_dataset=tokenized_dev,
             compute_metrics=compute_metrics,
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
             args=training_args
         )
         trainer.train()
         trainer.model.eval()
-        baseline_scores = trainer.evaluate(eval_dataset=tokenized_test_arg_quality)
+        baseline_scores = trainer.evaluate(eval_dataset=tokenized_test)
         print(baseline_scores)
         trainer.save_model(output_dir=save+"/LM_classification")
-
-    model_class = BertForSequenceClassification.from_pretrained(load + "/LM_classification", num_labels=2, output_hidden_states=True).to(DEVICE)
+    else:
+        #model_class = BertForSequenceClassification.from_pretrained(load + "/LM_classification", num_labels=2, output_hidden_states=True).to(DEVICE)
+        pass
 
     model_class = model_class.to("cpu") if model_class is not None else model.to("cpu")
     model = model.to("cpu")
-    # example masking
-    text = f"This is a great {model_attributes.mask}."
-    inputs = tokenizer(text, return_tensors="pt")
-    token_logits = model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"])["logits"]
-    mask_token_index = torch.argwhere(inputs["input_ids"] == tokenizer.mask_token_id)
-    mask_token_logits = token_logits[0, mask_token_index, :][0,1]
-    top_5_tokens = torch.argsort(-mask_token_logits)[:10].tolist()
-
-    for token in top_5_tokens:
-        print(f">>> {text.replace(tokenizer.mask_token, tokenizer.decode(token)[model_attributes.start:])}")
 
     #words = ["t"herefore", "consequently", "hence", "thus", "so", "nevertheless", "however", "yet", "anyway", "although"]
     #words = ["t"he", "a", "hence", "thus", "and", "this", "he", "she", "it", "yet", "be", "to", "that", "for", "as", "have", "but", "by", "from", "say", "his", "her", "its", "with", "will", "can", "of", "in", "i", "not"]
@@ -581,7 +596,8 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "nevertheless",
         "yet",
         "anyway",
-        "still"
+        "still",
+        "and"
     ]))
     """
     words2 = list(dict.fromkeys([
@@ -699,8 +715,6 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     words = list(dict.fromkeys(words1))
 
     print(len(words))
-    #words = ["he", "her", "she", "can", "and", "yet", "as", "it", "that", "will"]
-    #words = ["the", "a", "hence", "thus", "and", "this", "he", "she", "it", "yet"]
     word_mapping = {word: i for i, word in enumerate(words)} # map words to numbers to sort them later
 
     if calc_bert_embeddings and load_bert_embeddings:
@@ -708,9 +722,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         bert_embeddings_test = np.load(load + '/bert_embeddings_test.npy', allow_pickle=True)
         bert_embeddings_dev = np.load(load + '/bert_embeddings_dev.npy', allow_pickle=True)
     elif calc_bert_embeddings:
-        bert_embeddings_train = extract_bert_embeddings(train_arg_quality, tokenizer, model_class)
-        bert_embeddings_test = extract_bert_embeddings(test_arg_quality, tokenizer, model_class)
-        bert_embeddings_dev = extract_bert_embeddings(dev_arg_quality, tokenizer, model_class)
+        bert_embeddings_train = extract_bert_embeddings(premise_conclusion_train, tokenizer, model_class) #CHANGE
+        bert_embeddings_test = extract_bert_embeddings(premise_conclusion_test, tokenizer, model_class) #CHANGE
+        bert_embeddings_dev = extract_bert_embeddings(premise_conclusion_dev, tokenizer, model_class) #CHANGE
     np.save(save + '/bert_embeddings_train.npy', bert_embeddings_train, allow_pickle=True)
     np.save(save + '/bert_embeddings_test.npy', bert_embeddings_test, allow_pickle=True)
     np.save(save + '/bert_embeddings_dev.npy', bert_embeddings_dev, allow_pickle=True)
@@ -731,43 +745,32 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     np.save(save + '/embedding_test.npy', embedding_test, allow_pickle=True)
     np.save(save + '/embedding_dev.npy', embedding_dev, allow_pickle=True)
 
-    print(bert_embeddings_train.shape, np.array(list(zip(*embedding_train))[1]).shape)
-
-    # standardise embeddings and transform to numpy arrays
-    x_train = np.array(list(zip(*embedding_train))[1])
-    print(embedding_train)
-    #x_train = StandardScaler().fit_transform(x_train)
-    #x_train = np.array([StandardScaler().fit_transform(np.array(sample).reshape(-1,1)) for sample in x_train], dtype=object).reshape(-1,len(words))
-
-    x_test = np.array(list(zip(*embedding_test))[1])
-    #x_test = StandardScaler().fit_transform(x_test)
-    #x_test = np.array([StandardScaler().fit_transform(np.array(sample).reshape(-1,1)) for sample in x_test], dtype=object).reshape(-1,len(words))
-
-    x_dev = np.array(list(zip(*embedding_dev))[1])
+    # Extract and transform embeddings to numpy arrays
+    x_train_orig = np.array(list(zip(*embedding_train))[1])
+    x_test_orig = np.array(list(zip(*embedding_test))[1])
+    x_dev_orig = np.array(list(zip(*embedding_dev))[1])
 
     y_train = np.array(list(zip(*embedding_train))[0])
-
     y_test = np.array(list(zip(*embedding_test))[0])
-
     y_dev = np.array(list(zip(*embedding_dev))[0])
 
-    x_train_dft = pd.DataFrame(x_train, columns=words).astype("float32")
-    x_test_dft = pd.DataFrame(x_test, columns=words).astype("float32")
-    x_dev_dft = pd.DataFrame(x_dev, columns=words).astype("float32")
+    x_train_df_orig = pd.DataFrame(x_train_orig, columns=words).astype("float32")
+    x_test_df_orig = pd.DataFrame(x_test_orig, columns=words).astype("float32")
+    x_dev_df_orig = pd.DataFrame(x_dev_orig, columns=words).astype("float32")
 
-    y_train_dft = pd.DataFrame(y_train).astype(int)
-    y_test_dft = pd.DataFrame(y_test).astype(int)
-    y_dev_dft = pd.DataFrame(y_dev).astype(int)
+    y_train_df = pd.DataFrame(y_train).astype(int)
+    y_test_df = pd.DataFrame(y_test).astype(int)
+    y_dev_df = pd.DataFrame(y_dev).astype(int)
 
-    print(y_train.shape)
-    print(x_train.shape)
+    print(x_train_df_orig.shape, x_test_df_orig.shape, x_dev_df_orig.shape, y_train_df.shape, y_test_df.shape, y_dev_df.shape)
 
-    # lgbm classification
-    train_data = lgb.Dataset(x_train, label=y_train)
-    test_data = lgb.Dataset(x_test, label=y_test)
-    validation_data = lgb.Dataset(x_dev, label=y_dev)
+    bert_embeddings_train = bert_embeddings_train.squeeze()
+    bert_embeddings_test = bert_embeddings_test.squeeze()
+    bert_embeddings_dev = bert_embeddings_dev.squeeze()
 
-    params = {
+    print(bert_embeddings_train.shape, bert_embeddings_test.shape, bert_embeddings_dev.shape)
+
+    params_lgbm = {
         'boosting_type': 'gbdt',
         'objective': 'binary',
         'metric': {'f1'},
@@ -781,428 +784,204 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         'device': 'gpu'
     }
     num_round = 10000
-    iteration = 10000
-
-    x_train_dft, x_test_dft, x_dev_dft = feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params)
-
-    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), num_round, valid_sets=[lgb.Dataset(x_dev_dft, label=y_dev_dft)], callbacks=[lgb.early_stopping(stopping_rounds=40), lgb.log_evaluation(100)], feval=lgb_f1_score)
-
-    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
-    f1_lgbm_best = f1_score(y_test_dft, (np.round(ypred)), average='macro')
-    print(f"f1_lgbm: {f1_lgbm_best}")
-
-    bst = lgb.train(params, train_data, num_round, valid_sets=[validation_data], callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    print(bst.feature_importance())
-    imp = [(x, y) for y, x in sorted(zip(bst.feature_importance(), words), key=lambda x: x[0], reverse=True)]
-    for t in imp:
-        print(f"{t[0]}: {t[1]}")
-
-    ypred = bst.predict(x_test)
-    f1_lgbm = f1_score(y_test, (np.round(ypred)), average='macro')
-    print(f1_lgbm)
-
-    # pca visualization
-    if pca:
-        pca = PCA(n_components=2)
-
-        X_r = pca.fit(x_test).transform(x_test)
-        plt.figure()
-        colors = ["navy", "turquoise"]
-        lw = 2
-        y = y_test
-
-        for color, i, target_name in zip(colors, [0, 1], [0, 1]):
-            plt.scatter(
-                X_r[y == i, 0], X_r[y == i, 1], color=color, alpha=0.8, lw=lw, label=target_name
-            )
-        plt.legend(loc="best", shadow=False, scatterpoints=1)
-        plt.title("PCA")
-
-    # simple neural net classification same as in BERT Classification Head but without Dropout
-    class MLP(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.layers = nn.Sequential(
-                nn.Linear(len(words), 2),
-            )
-
-
-        def forward(self, x):
-            return self.layers(x)
-
-    x_train = np.array(x_train, dtype="float32")
-    dataset = TensorDataset(Tensor(x_train), Tensor(y_train))
-    trainloader = DataLoader(dataset, batch_size=10, shuffle=True)
-
-    torch.manual_seed(42)
-    mlp = MLP()
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(mlp.parameters(), lr=1e-4)
-    for epoch in range(10):
-        print(f'Starting epoch {epoch+1}')
-        current_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
-            
-            inputs, targets = data
-            targets = targets.long()
-            
-            optimizer.zero_grad()
-            
-            outputs = mlp(inputs)
-            
-            loss = loss_function(outputs, targets)
-            
-            loss.backward()
-            
-            optimizer.step()
-            
-            current_loss += loss.item()
-            """
-            if i % 500 == 499:
-                print('Loss after mini-batch %5d: %.3f' %
-                    (i + 1, current_loss / 500))
-                current_loss = 0.0
-            """
-    print('Training process has finished.')
-
-    x_test = np.array(x_test, dtype="float32")
-    dataset_test = TensorDataset(Tensor(x_test), Tensor(y_test))
-
-    pred = []
-    testloader = DataLoader(dataset_test, batch_size=10, shuffle=False)
-    with torch.no_grad():
-        for i, data in enumerate(testloader, 0):
-
-            inputs, targets = data
-            targets = targets.long()
-
-            outputs = mlp(inputs)
-
-            _, predicted = torch.max(outputs, 1)
-            pred.extend(predicted.tolist())
-
-    f1_nn = f1_score(y_test, pred, average='macro')
-    print(f1_nn)
-
-    embedding_train_array = np.array(list(zip(*embedding_train))[1])
-    #embedding_complete_array = np.array(list(zip(*embedding_complete))[1])
-    #embedding_train_array = x_train_dft.to_numpy()
-
-    # multiply the probability of each word with all the inverse probabilities of the other words and remove the diagonal
-    # this yields precentage deviation instead of pure probabilities
-    matrix = (embedding_train_array[...,None]*(1/embedding_train_array[:,None]))
-    #matrix = (embedding_complete_array[...,None]*(1/embedding_complete_array[:,None]))
-    idx = np.where(~np.eye(matrix[0].shape[0], dtype=bool))
-
-    matrix_without_diag_flat_train = np.array([mat[idx] for mat in matrix])
-
-    # create the same array but for the words themselves (-> used as naming scheme for importance)
-    word_stack1 = [w for _ in range(len(words)) for w in words]
-    word_stack2 = [w for w in words for _ in range(len(words))]
-    word_matrix = [f"{y}/{x}" for y, x in zip(word_stack2, word_stack1)]
-    idx_words = word_matrix[0::(len(words)+1)]
-    word_matrix_without_diag_flat = np.array([mat for mat in word_matrix if mat not in idx_words])
-    matrix_without_diag_flat_train_df = pd.DataFrame(matrix_without_diag_flat_train, columns=word_matrix_without_diag_flat).astype("float32")
-    x_train_dft = matrix_without_diag_flat_train_df
-
-    embedding_test_array = np.array(list(zip(*embedding_test))[1])
-    #embedding_test_array = x_test_dft.to_numpy()
-
-    matrix = (embedding_test_array[...,None]*(1/embedding_test_array[:,None]))
-    idx = np.where(~np.eye(matrix[0].shape[0],dtype=bool))
-
-    matrix_without_diag_flat_test = np.array([mat[idx] for mat in matrix])
-
-    matrix_without_diag_flat_test_df = pd.DataFrame(matrix_without_diag_flat_test, columns=word_matrix_without_diag_flat).astype("float32")
-    x_test_dft = matrix_without_diag_flat_test_df
-
-    embedding_dev_array = np.array(list(zip(*embedding_dev))[1])
-    #embedding_test_array = x_test_dft.to_numpy()
-
-    matrix = (embedding_dev_array[...,None]*(1/embedding_dev_array[:,None]))
-    idx = np.where(~np.eye(matrix[0].shape[0],dtype=bool))
-
-    matrix_without_diag_flat_dev = np.array([mat[idx] for mat in matrix])
-
-    matrix_without_diag_flat_dev_df = pd.DataFrame(matrix_without_diag_flat_dev, columns=word_matrix_without_diag_flat).astype("float32")
-    x_dev_dft = matrix_without_diag_flat_dev_df
-
-    train_data = lgb.Dataset(matrix_without_diag_flat_train, label=y_train)
-    validation_data = lgb.Dataset(matrix_without_diag_flat_dev, label=y_dev)
-    test_data = lgb.Dataset(matrix_without_diag_flat_test, label=y_test)
-
-    x_train_dft, x_test_dft, x_dev_dft = feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params)
-
-    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    ypred = lgb_modelt.predict(x_test_dft)
-    f1_lgbm_best_matrix = f1_score(y_test_dft, (np.round(ypred)), average='macro')
-    print(f"f1_lgbm_matrix: {f1_lgbm_best_matrix}")
-
-    bst = lgb.train(params, train_data, num_round, valid_sets=[validation_data], callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    df_feature_importance2 = (
-        pd.DataFrame({
-            'feature': bst.feature_name(),
-            'importance': bst.feature_importance(),
-        })
-        .sort_values('importance', ascending=False)
-    )
-    print(df_feature_importance2)
-
-    ypred = bst.predict(matrix_without_diag_flat_test)
-    f1_matrix_lgbm = f1_score(y_test, (np.round(ypred)), average='macro')
-
-    class MLP(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.layers = nn.Sequential(
-                nn.Dropout(p=0.1),
-                nn.Linear(matrix_without_diag_flat_train.shape[1], 2),
-            )
-
-
-        def forward(self, x):
-            return torch.nn.functional.log_softmax(self.layers(x), dim=1)
-
-    x_train = matrix_without_diag_flat_train
-    dataset = TensorDataset(Tensor(x_train), Tensor(y_train))
-    trainloader = DataLoader(dataset, batch_size=64, shuffle=True)
-
-    torch.manual_seed(42)
-    mlp = MLP()
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(mlp.parameters(), lr=1e-5)
-
-    for epoch in range(3):
-        print(f'Starting epoch {epoch+1}')
-        current_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
-            
-            inputs, targets = data
-            targets = targets.long()
-            
-            optimizer.zero_grad()
-            
-            outputs = mlp(inputs)
-            
-            loss = loss_function(outputs, targets)
-            
-            loss.backward()
-            
-            optimizer.step()
-            
-            current_loss += loss.item()
-            """
-            if i % 50 == 49:
-                print('Loss after mini-batch %5d: %.3f' %
-                    (i + 1, current_loss / 50))
-                current_loss = 0.0
-            """
-    print('Training process has finished.')
-
-    x_test = matrix_without_diag_flat_test
-    dataset_test = TensorDataset(Tensor(x_test), Tensor(y_test))
-
-    pred = []
-    testloader = DataLoader(dataset_test, batch_size=10, shuffle=False)
-    with torch.no_grad():
-        for i, data in enumerate(testloader, 0):
-
-            inputs, targets = data
-            targets = targets.long()
-
-            outputs = mlp(inputs)
-
-            _, predicted = torch.max(outputs, 1)
-            pred.extend(predicted.tolist())
-
-    f1_matrix_nn = f1_score(y_test, pred, average='macro')
-
-    combined_bert_embeddings_train = np.array(list(zip(*embedding_train))[1])
-    bert_embeddings_train = bert_embeddings_train.reshape(bert_embeddings_train.shape[0], -1)
-    print(bert_embeddings_train.shape, combined_bert_embeddings_train.shape)
-    x_train = np.concatenate((bert_embeddings_train, combined_bert_embeddings_train), axis=1)
-
-    combined_bert_embeddings_test = np.array(list(zip(*embedding_test))[1])
-    bert_embeddings_test = bert_embeddings_test.reshape(bert_embeddings_test.shape[0], -1)
-    x_test = np.concatenate((bert_embeddings_test, combined_bert_embeddings_test), axis=1)
-
-    combined_bert_embeddings_dev = np.array(list(zip(*embedding_dev))[1])
-    bert_embeddings_dev = bert_embeddings_dev.reshape(bert_embeddings_dev.shape[0], -1)
-    x_dev = np.concatenate((bert_embeddings_dev, combined_bert_embeddings_dev), axis=1)
-
-    y_train = np.array(list(zip(*embedding_train))[0])
-
-    y_test = np.array(list(zip(*embedding_test))[0])
-
-    y_dev = np.array(list(zip(*embedding_dev))[0])
-
-    x_train_dft = pd.DataFrame(x_train, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
-    x_test_dft = pd.DataFrame(x_test, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
-    x_dev_dft = pd.DataFrame(x_dev, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
-
-    y_train_dft = pd.DataFrame(y_train).astype(int)
-    y_test_dft = pd.DataFrame(y_test).astype(int)
-    y_dev_dft = pd.DataFrame(y_dev).astype(int)
-
-    # lgbm classification
-    train_data = lgb.Dataset(x_train, label=y_train)
-    test_data = lgb.Dataset(x_test, label=y_test)
-    validation_data = lgb.Dataset(x_dev, label=y_dev)
-
-    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
-    f1_lgbm_combined = f1_score(y_test_dft, (np.round(ypred)), average='macro')
-    print(f"f1_lgbm_WARNUNG: {f1_lgbm_combined}")
-
-    x_train_dft, x_test_dft, x_dev_dft = feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params)
-
-    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
-    f1_lgbm_best_combined = f1_score(y_test_dft, (np.round(ypred)), average='macro')
-    print(f"f1_lgbm: {f1_lgbm_best_combined}")
-
-    x_train_dft = pd.DataFrame(bert_embeddings_train, columns=[f"{i}" for i in range(768)]).astype("float32")
-    x_test_dft = pd.DataFrame(bert_embeddings_test, columns=[f"{i}" for i in range(768)]).astype("float32")
-    x_dev_dft = pd.DataFrame(bert_embeddings_dev, columns=[f"{i}" for i in range(768)]).astype("float32")
-
-    y_train_dft = pd.DataFrame(y_train).astype(int)
-    y_test_dft = pd.DataFrame(y_test).astype(int)
-    y_dev_dft = pd.DataFrame(y_dev).astype(int)
-
-    # lgbm classification
-    train_data = lgb.Dataset(x_train, label=y_train)
-    test_data = lgb.Dataset(x_test, label=y_test)
-    validation_data = lgb.Dataset(x_dev, label=y_dev)
-
-    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
-    f1_lgbm_BERT = f1_score(y_test_dft, (np.round(ypred)), average='macro')
-    print(f"f1_lgbm_WARNUNG222: {f1_lgbm_BERT}")
-
-    x_train_dft, x_test_dft, x_dev_dft = feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params)
-
-    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
-    f1_lgbm_best_BERT = f1_score(y_test_dft, (np.round(ypred)), average='macro')
-    print(f"f1_lgbm222: {f1_lgbm_best_BERT}")
-
-    class MLP(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.layers = nn.Sequential(
-                nn.Dropout(p=0.1),
-                nn.Linear(bert_embeddings_train.shape[1], 2),
-            )
-
-
-        def forward(self, x):
-            return torch.nn.functional.log_softmax(self.layers(x), dim=1)
-
-    x_train = bert_embeddings_train
-    dataset = TensorDataset(Tensor(x_train), Tensor(y_train))
-    trainloader = DataLoader(dataset, batch_size=64, shuffle=True)
-
-    torch.manual_seed(42)
-    mlp = MLP()
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(mlp.parameters(), lr=1e-5)
-
-    for epoch in range(3):
-        print(f'Starting epoch {epoch+1}')
-        current_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
-            
-            inputs, targets = data
-            targets = targets.long()
-            
-            optimizer.zero_grad()
-            
-            outputs = mlp(inputs)
-            
-            loss = loss_function(outputs, targets)
-            
-            loss.backward()
-            
-            optimizer.step()
-            
-            current_loss += loss.item()
-            """
-            if i % 50 == 49:
-                print('Loss after mini-batch %5d: %.3f' %
-                    (i + 1, current_loss / 50))
-                current_loss = 0.0
-            """
-    print('Training process has finished.')
-
-    x_test = bert_embeddings_test
-    dataset_test = TensorDataset(Tensor(x_test), Tensor(y_test))
-
-    pred = []
-    testloader = DataLoader(dataset_test, batch_size=10, shuffle=False)
-    with torch.no_grad():
-        for i, data in enumerate(testloader, 0):
-
-            inputs, targets = data
-            targets = targets.long()
-
-            outputs = mlp(inputs)
-
-            _, predicted = torch.max(outputs, 1)
-            pred.extend(predicted.tolist())
-
-    f1_BERT_nn = f1_score(y_test, pred, average='macro')
-    print("BERT_nn:",f1_BERT_nn)
-
-    x_train = np.concatenate((bert_embeddings_train, matrix_without_diag_flat_train), axis=1)
-    x_test = np.concatenate((bert_embeddings_test, matrix_without_diag_flat_test), axis=1)
-    x_dev = np.concatenate((bert_embeddings_dev, matrix_without_diag_flat_dev), axis=1)
-
-    x_train_dft = pd.DataFrame(x_train, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
-    x_test_dft = pd.DataFrame(x_test, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
-    x_dev_dft = pd.DataFrame(x_dev, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
-
-    train_data = lgb.Dataset(x_train, label=y_train)
-    test_data = lgb.Dataset(x_test, label=y_test)
-    validation_data = lgb.Dataset(x_dev, label=y_dev)
-
-    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
-    f1_lgbm_combined_matrix = f1_score(y_test_dft, (np.round(ypred)), average='macro')
-    print(f"f1_lgbm_WARNUNG_matrix: {f1_lgbm_combined}")
-
-    x_train_dft, x_test_dft, x_dev_dft = feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params)
-
-    lgb_modelt = lgb.train(params, lgb.Dataset(x_train_dft, label=y_train_dft), iteration, valid_sets = [lgb.Dataset(x_train_dft, label=y_train_dft), lgb.Dataset(x_dev_dft, label=y_dev_dft)], verbose_eval=100, callbacks=[lgb.early_stopping(stopping_rounds=40)], feval=lgb_f1_score)
-
-    ypred = lgb_modelt.predict(x_test_dft, num_iteration=lgb_modelt.best_iteration)
-    f1_lgbm_best_combined_matrix = f1_score(y_test_dft, (np.round(ypred)), average='macro')
-    print(f"f1_lgbm: {f1_lgbm_best_combined_matrix}")
-
+    lgbm_classifier = Classifier(class_type="lgbm")
+
+    params_nn = {
+        "input_length" : len(words),
+        "batch_size" : 10,
+        "lr" : 1e-4, 
+        "seed" : 42, 
+        "epochs" : 40
+    }
+    nn_classifier = Classifier(class_type="nn")
+
+    ###############################################
+    # NORMAL EMBEDDINGS WITHOUT FEATURE SELECTION #
+    ###############################################
+
+    f1_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_df_orig, y_train_df, x_test_df_orig, y_test_df, x_dev_df_orig, y_dev_df, num_round)
+    f1_nn = nn_classifier.train_and_eval(params_nn, x_train_orig, y_train, x_test_orig, y_test)
+
+    ############################################
+    # NORMAL EMBEDDINGS WITH FEATURE SELECTION #
+    ############################################
+
+    x_train_df, x_test_df, x_dev_df = feature_extraction(x_train_df_orig, x_test_df_orig, x_dev_df_orig, y_train_df, params_lgbm)
+
+    f1_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
+    f1_nn_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_test_df.to_numpy(), y_test)
+
+    ############################
+    # CREATE MATRIX EMBEDDINGS #
+    ############################
+
+    x_train_matrix, x_train_matrix_df = create_matrix_embedding(x_train_orig, words)
+    x_test_matrix, x_test_matrix_df = create_matrix_embedding(x_test_orig, words)
+    x_dev_matrix, x_dev_matrix_df = create_matrix_embedding(x_dev_orig, words)
+
+    params_nn = {
+        "input_length" : x_train_matrix.shape[1],
+        "batch_size" : 10,
+        "lr" : 1e-4, 
+        "seed" : 42, 
+        "epochs" : 15
+    }
+
+    ###############################################
+    # MATRIX EMBEDDINGS WITHOUT FEATURE SELECTION #
+    ###############################################
+
+    f1_matrix_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_df, y_train_df, x_test_matrix_df, y_test_df, x_dev_matrix_df, y_dev_df, num_round)
+    f1_matrix_nn = nn_classifier.train_and_eval(params_nn, x_train_matrix, y_train, x_test_matrix, y_test)
+
+    ############################################
+    # MATRIX EMBEDDINGS WITH FEATURE SELECTION #
+    ############################################
+
+    x_train_matrix_df, x_test_matrix_df, x_dev_matrix_df = feature_extraction(x_train_matrix_df, x_test_matrix_df, x_dev_matrix_df, y_train_df, params_lgbm)
+
+    params_nn = {
+        "input_length" : x_train_matrix_df.to_numpy().shape[1],
+        "batch_size" : 10,
+        "lr" : 1e-4, 
+        "seed" : 42, 
+        "epochs" : 15
+    }
+
+    f1_matrix_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_df, y_train_df, x_test_matrix_df, y_test_df, x_dev_matrix_df, y_dev_df, num_round)
+    f1_matrix_nn_best = nn_classifier.train_and_eval(params_nn, x_train_matrix_df.to_numpy(), y_train, x_test_matrix_df.to_numpy(), y_test)
+
+    ##################################################
+    # BERT EMBEDDINGS ONLY WITHOUT FEATURE SELECTION #
+    ##################################################
+
+    x_train_df = pd.DataFrame(bert_embeddings_train, columns=[f"{i}" for i in range(768)]).astype("float32")
+    x_test_df = pd.DataFrame(bert_embeddings_test, columns=[f"{i}" for i in range(768)]).astype("float32")
+    x_dev_df = pd.DataFrame(bert_embeddings_dev, columns=[f"{i}" for i in range(768)]).astype("float32")
+
+    params_nn = {
+        "input_length" : bert_embeddings_train.shape[1],
+        "batch_size" : 10,
+        "lr" : 1e-4, 
+        "seed" : 42, 
+        "epochs" : 15
+    }
+
+    f1_bert_only_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
+    f1_bert_only_nn = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_test_df.to_numpy(), y_test)
+
+    ##################################################
+    # COMBINE BERT EMBEDDINGS WITH NORMAL EMBEDDINGS #
+    ##################################################
+
+    x_train_bert = np.concatenate((bert_embeddings_train, x_train_orig), axis=1)
+    x_test_bert = np.concatenate((bert_embeddings_test, x_test_orig), axis=1)
+    x_dev_bert = np.concatenate((bert_embeddings_dev, x_dev_orig), axis=1)
+
+    # just use numbers from 0 to 767 to name dimension of BERT embeddings
+    x_train_bert_df = pd.DataFrame(x_train_bert, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
+    x_test_bert_df = pd.DataFrame(x_test_bert, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
+    x_dev_bert_df = pd.DataFrame(x_dev_bert, columns=([f"{i}" for i in range(768)] + words)).astype("float32")
+
+    params_nn = {
+        "input_length" : x_train_bert.shape[1],
+        "batch_size" : 10,
+        "lr" : 1e-4, 
+        "seed" : 42, 
+        "epochs" : 15
+    }
+
+    ####################################################################
+    # BERT EMBEDDINGS WITH NORMAL EMBEDDINGS WITHOUT FEATURE SELECTION #
+    ####################################################################
+
+    f1_bert_normal_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_bert_df, y_train_df, x_test_bert_df, y_test_df, x_dev_bert_df, y_dev_df, num_round)
+    f1_bert_normal_nn = nn_classifier.train_and_eval(params_nn, x_train_bert, y_train, x_test_bert, y_test)
+
+    #################################################################
+    # BERT EMBEDDINGS WITH NORMAL EMBEDDINGS WITH FEATURE SELECTION #
+    #################################################################
+
+    x_train_df, x_test_df, x_dev_df = feature_extraction(x_train_bert_df, x_test_bert_df, x_dev_bert_df, y_train_df, params_lgbm)
+
+    params_nn = {
+        "input_length" : x_train_df.to_numpy().shape[1],
+        "batch_size" : 10,
+        "lr" : 1e-4, 
+        "seed" : 42, 
+        "epochs" : 15
+    }
+
+    f1_bert_lgbm_normal_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
+    f1_bert_nn_normal_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_test_df.to_numpy(), y_test)
+
+    ##################################################
+    # COMBINE BERT EMBEDDINGS WITH MATRIX EMBEDDINGS #
+    ##################################################
+
+    x_train_matrix_bert = np.concatenate((bert_embeddings_train, x_train_matrix), axis=1)
+    x_test_matrix_bert = np.concatenate((bert_embeddings_test, x_test_matrix), axis=1)
+    x_dev_matrix_bert = np.concatenate((bert_embeddings_dev, x_dev_matrix), axis=1)
+
+    word_matrix_without_diag_flat = create_word_matrix_idx(words)
+    x_train_matrix_bert_df = pd.DataFrame(x_train_matrix_bert, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
+    x_test_matrix_bert_df = pd.DataFrame(x_test_matrix_bert, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
+    x_dev_matrix_bert_df = pd.DataFrame(x_dev_matrix_bert, columns=([f"{i}" for i in range(768)] + list(word_matrix_without_diag_flat))).astype("float32")
+
+    params_nn = {
+        "input_length" : x_train_matrix_bert.shape[1],
+        "batch_size" : 10,
+        "lr" : 1e-4, 
+        "seed" : 42, 
+        "epochs" : 15
+    }
+
+    ####################################################################
+    # BERT EMBEDDINGS WITH MATRIX EMBEDDINGS WITHOUT FEATURE SELECTION #
+    ####################################################################
     
+    f1_bert_matrix_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_bert_df, y_train_df, x_test_matrix_bert_df, y_test_df, x_dev_matrix_bert_df, y_dev_df, num_round)
+    f1_bert_matrix_nn = nn_classifier.train_and_eval(params_nn, x_train_matrix_bert, y_train, x_test_matrix_bert, y_test)
+
+    #################################################################
+    # BERT EMBEDDINGS WITH MATRIX EMBEDDINGS WITH FEATURE SELECTION #
+    #################################################################
+
+    x_train_df, x_test_df, x_dev_df = feature_extraction(x_train_matrix_bert_df, x_test_matrix_bert_df, x_dev_matrix_bert_df, y_train_df, params_lgbm)
+
+    params_nn = {
+        "input_length" : x_train_df.to_numpy().shape[1],
+        "batch_size" : 10,
+        "lr" : 1e-4, 
+        "seed" : 42, 
+        "epochs" : 15
+    }
+
+    f1_bert_matrix_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
+    f1_bert_matrix_nn_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_test_df.to_numpy(), y_test)
+
+    #################################################################
 
     final_scores = {
         "f1_lgbm": f1_lgbm,
         "f1_nn": f1_nn, 
-        "f1_matrix_lgbm": f1_matrix_lgbm, 
-        "f1_matrix_nn": f1_matrix_nn, 
-        "f1_lgbm_best_select": f1_lgbm_best, 
-        "f1_lgbm_best_matrix": f1_lgbm_best_matrix, 
-        "f1_lgbm_combined": f1_lgbm_combined, 
-        "f1_lgbm_best_combined": f1_lgbm_best_combined, 
-        "baseline_scores": baseline_scores, 
-        "f1_lgbm_combined_matrix": f1_lgbm_combined_matrix, 
-        "f1_lgbm_best_combined_matrix": f1_lgbm_best_combined_matrix,
-        "f1_lgbm_best_BERT": f1_lgbm_best_BERT,
-        "f1_lgbm_BERT": f1_lgbm_BERT,
-        "f1_BERT_nn": f1_BERT_nn
+        "f1_lgbm_best" : f1_lgbm_best,
+        "f1_nn_best" : f1_nn_best,
+        "f1_matrix_lgbm" : f1_matrix_lgbm,
+        "f1_matrix_nn" : f1_matrix_nn,
+        "f1_matrix_lgbm_best" : f1_matrix_lgbm_best,
+        "f1_matrix_nn_best" : f1_matrix_nn_best,
+        "f1_bert_only_lgbm" : f1_bert_only_lgbm,
+        "f1_bert_only_nn" : f1_bert_only_nn,
+        "f1_bert_normal_lgbm" : f1_bert_normal_lgbm,
+        "f1_bert_normal_nn" : f1_bert_normal_nn,
+        "f1_bert_lgbm_normal_best" : f1_bert_lgbm_normal_best,
+        "f1_bert_nn_normal_best" : f1_bert_nn_normal_best,
+        "f1_bert_matrix_lgbm" : f1_bert_matrix_lgbm,
+        "f1_bert_matrix_nn" : f1_bert_matrix_nn,
+        "f1_bert_matrix_lgbm_best" : f1_bert_matrix_lgbm_best,
+        "f1_bert_matrix_nn_best" : f1_bert_matrix_nn_best,
+        "baseline_scores" : baseline_scores
     }
     print(final_scores)
     with open(save + "/scores.json", "w", encoding="utf8") as f:
@@ -1212,26 +991,19 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
 
 if __name__ == "__main__":
-    model_attributes = ModelAttributes("bert-base-uncased")
+    #model_attributes = ModelAttributes("bert-base-uncased")
+    model_attributes = ModelAttributes("roberta-base")
 
-    load = "./models/loop20"
+    load = "./models/run_7_config_1001001011"
     Path(load).mkdir(parents=True, exist_ok=True)
 
-    load_prev = False # further train a previously trained model
-    train = True # train model or use a saved one. If this is False, load_prev is always True
-    train_on_premise_conclusion = False # train on premise conclusion dataset
-    train_on_arg_quality = True # train on arg quality dataset
-    pretrain = False # pretrain on chatgpt and argumentsUnits data
-    load_embedding = False # load old embedding or calcualte a new one
-    stance = True # stance classification or arg val
-    pca = False # visualize with pca
-    baseline = True # baseline classification
-    calc_bert_embeddings = True # extract embeddings from bert
-    load_bert_embeddings = False # load saved bert embeddings
-    all_bool_args = load_prev, train, train_on_premise_conclusion, pretrain, train_on_arg_quality, load_embedding, stance, pca, baseline, calc_bert_embeddings, load_bert_embeddings
+    # load and read boolean arguments from the config file
+    config = configparser.ConfigParser()
+    config.read('./src/config.ini')
+    all_bool_args = [True if config.get('BooleanArgs',i) == "True" else False for i in config['BooleanArgs']]
     
     save_suffix = "".join([str(int(i)) for i in all_bool_args])
-    save = "./models/run_1_config_" + save_suffix
+    save = "./models/run_10_config_" + save_suffix
     print(save)
 
     Path(save).mkdir(parents=True, exist_ok=True)

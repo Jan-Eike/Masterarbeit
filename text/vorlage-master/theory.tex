@@ -1,4 +1,4 @@
-\section{Theoretical background}
+\section{Theoretical background and related work} \label{theory}
 In this chapter, we will explain all the relevant background information needed to follow along with the thesis. \\
 We will start by defining the main tasks and continue with describing all the used machine learning techniques. The last section will be about metrics for evaluation.
 
@@ -6,27 +6,91 @@ We will start by defining the main tasks and continue with describing all the us
 We are going to evaluate our approaches on the two following tasks.
 
 \subsubsection{Validity Classification}
-As described in \cite{argsvalidnovel2022}, a conclusion of a premise is considered valid if it follows naturally from its premise. \\
-Following this definition, validity classification is a binary classification task in which we want to determine whether a conclusion is valid, given its premise. The label $1$ corresponds to a valid conclusion and the label $0$ to an invalid conclusion \cite{argsvalidnovel2022}.
+As described in \cite{argsvalidnovel2022}, a conclusion of a premise is considered valid if it follows naturally from its premise. In our case, a premise is a statement consisting of at least one sentence regarding a certain topic and a conclusion consists of exactly one sentence that sums up the premise.\\
+Following this definition, validity classification is a binary classification task in which we want to determine whether a conclusion is valid, given its premise. The label $1$ corresponds to a valid conclusion and the label $0$ to an invalid conclusion \cite{argsvalidnovel2022}. An example is shown in figure \ref{fig:val_class1}.
 
-\subsubsection{Stance Classification}
-Our second main tasks is called stance classification. It is a classification task in which we want to decide whether the author of a text is for, against or neutral towards a certain statement \cite{mohammad2017stance}.
+\begin{figure}[H]
+  \begin{center}
+   	\begin{tabular}{|| c | c | c||}
+   	\hline
+   	Premise & Conclusion & Validity \\ [0.5ex]
+   	\hline\hline
+   	\multirow{2}{*}{\makecell{A November 2009 CBS News Poll found \\ that only 40 percent of Americans \\ want Mohammed and his four minions \\ to be tried in federal criminal court.}} & Wind energy is free. & 0 \\\cline{2-3}
+ 	& \makecell{Majority of Americans \\ are opposed to civilian \\ trial of terrorists.} & 1 \\
+ 	\hline
+	\end{tabular}
+  \end{center}
+  \caption{Example for validity classification.}%
+  \label{fig:val_class1}
+\end{figure}
+
+Since we are only interested in the validity of the conclusion, comparisons to the Validity and Novelty Prediction Shared Task \cite{argsvalidnovel2022}, from which we adapted the task, are less meaningful because they classify validity and another label called novelty at the same time. Hence we will adapt their baseline for our task and use this to compare our models.
+
+
+\subsubsection{Stance Detection}
+
+Our second main tasks is called stance detection. It is a classification task in which we want to decide whether an argument which consists of at least one sentence, is for (positive stance) or against (negative stance) a certain statement which consists of one sentence about some topic \cite{mohammad2017stance}. A positive stance towards the statement corresponds to the label $1$ and a negative stance corresponds to the label $0$. Stance detection can be extended to have a third label which corresponds to a neutral opinion towards the statement but we will stick with the binary version in this thesis. An example for stance detection is shown in figure \ref{fig:stance_class1}.
+
+\begin{figure}[H]
+  \begin{center}
+   	\begin{tabular}{|| c | c | c||}
+   	\hline
+   	Statement & Argument & Stance \\ [0.5ex]
+   	\hline\hline
+   	\multirow{2}{*}{\makecell{ We should limit \\ executive \\ compensation.}} & \makecell{A company can pay higher to their \\ employees if executive compensation is limited.} & 1 \\\cline{2-3}
+ 	& \makecell{A company has the right to determine how \\ much executive compensation they can pay out.} & 0 \\
+ 	\hline
+	\end{tabular}
+  \end{center}
+  \caption{Example for stance detection.}%
+  \label{fig:stance_class1}
+\end{figure}
+
+\subsection{Linking words}
+As described in the beginning, we will use the probabilities of linking words to be at a certain position in a text to create additional features for our classifiers. We will use different lists of linking words as well as a list of words which are not necessarily considered linking words. The main list of linking words is the following:
+
+\begin{center}
+	[because, although, therefore, but, still, whereas, while, however, since, therefore, as, for, consequently, hence, thus, so, nevertheless, yet, anyway, still, and]
+\end{center}
+
+The other lists can be found in the appendix.
 
 \subsection{Language Models}
-A language model (LM) is a model that assigns probabilities to sequences of words \cite{languagemodels2023}. \\
-In this thesis, we will focus on masked LMs. These models are able to predict a masked word from a sentence, e.g.
-\begin{center}
+As hinted in the introduction, we will use language models to assign probabilities to linking words at certain positions in a text. A language model (LM) is a model that assigns probabilities to sequences of words \cite{languagemodels2023}. There are various types of LMs, achieving better performances in different areas. Especially since the release of ChatGPT \cite{chatgpt}, autoregressive models like GPT-3 have become very popular. These models assign probabilities to words, based on the context before the word and therefore generate one word after another based on these probabilities to generate text \cite{gpt3}. Other models, like BERT \cite{bert}, use a bidirectional approach which we will explain in detail in the next part. These bidirectional models are able to predict a masked word from a sentence, based on its left and right context. The model will then return a set of words and their corresponding probabilities to fill this [MASK] token \cite{bert}, as shown in figure \ref{fig:bert_masking_example}.
+
+\begin{figure}[H]
+  \begin{center}
 	\textit{Berlin is the capital of} \textbf{[MASK]}.
-\end{center}
-The model will then return a set of words and their corresponding probabilities to fill this [MASK] token \cite{bert}. LMs are often times pre-trained on large unlabeled text corpora to generate language representations like word vector embeddings which can later be fine-tuned on more specific tasks. In the next sections, we will present a few of these models.
+  \end{center}
+  \centering
+  \includegraphics[scale=0.9]{fig/bert_masking_example.png}
+  \caption{Example for masking of language models \cite{bertexample}. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
+  \label{fig:bert_masking_example}
+\end{figure}
+
+We will present another example (see figure \ref{fig:bert_masking_example2}), showing the capability of language models to also predict linking words since this will be the main focus of this work.
+
+\begin{figure}[H]
+  \begin{center}
+	\textit{Pizza tastes good}, [MASK] \textit{it's one of the most liked foods in the world}.
+  \end{center}
+  \centering
+  \includegraphics[scale=0.9]{fig/bert_masking_example2.png}
+  \caption{Example for linking word masking of language models \cite{bertexample2}. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
+  \label{fig:bert_masking_example2}
+\end{figure}
+
+The second example shows why we need to use bidirectional models instead of autoregressive models like GPT-3 since the linking word is dependent of both its left and right context. \\
+LMs are often times pre-trained on large unlabeled text corpora to generate language representations like word vector embeddings which can later be fine-tuned on more specific tasks. In the next sections, we will present two models that we are going to use.
+
 
 \subsubsection{BERT}
-BERT (Bidirectional Encoder Representations from Transformers) is a large LM (LLM) proposed by Delvin et al. \cite{bert}. Unlike older language models based on LSTMs which can only predict the next token based on the previous tokens, BERT uses a bidirectional approach. This is done by using the aforementioned masked LM pre-training objective. In this approach, a part of the input words gets masked and the training objective is to predict the original word based on its left and right context. Together with the next sentence prediction objective, this completes the pre-training for BERT. This model can now be used to solve many downstream tasks like classification or question answering, just by adding another layer on top. \\
-We will primarily use BERT for masked language modeling and directly for validity and stance classification. \\
+BERT (Bidirectional Encoder Representations from Transformers) is a LM proposed by Devlin et al. \cite{bert}. Unlike older language models based on LSTMs which can only predict the next token based on the previous tokens, BERT uses a bidirectional approach. This is done by using the aforementioned masked LM pre-training objective. In this approach, a part of the input words gets masked and the training objective is to predict the original word based on its left and right context. Together with the next sentence prediction objective, this completes the pre-training for BERT. This model can now be used to solve many downstream tasks like classification or question answering, just by adding another layer on top, depending on the specific task. BERT set new state-of-the-art performances for many NLP tasks and revolutionized the classic NLP pipeline due to it representing all the steps of the pipeline in one model \cite{bertexplain}.  \\
+We will primarily use BERT for masked language modeling and directly for validity and stance classification. There are different types of BERT one can consider, differing for example in the number of parameters, language or case sensitivity. The exact configurations and models used, will be explained in detail in the chapter about implementation. \\
 
 \textbf{Model Architecture} \\
 Although we do not need to understand BERT in every detail, one important part is needed in the course of this thesis, namely how the input and output is represented. \\
-Most importantly, for every input sequence, a special [CLS] token will be added as first character. This token is used in the last hidden state as an aggregate representation for the entire sequence. It can then be used for further downstream tasks like classification. The vector representations for all the other tokens in the output sequence are only used for token-level tasks like part-of-speech-tagging. Furthermore, a [SEP] token is added after each input sequence. With this technique, we can input two sequences as one into BERT which is used to perform the next sentence prediction task in the pre-training.
+Most importantly, for every input sequence, a special [CLS] token will be added as first character. This token is used in the last hidden state as an aggregate representation for the entire sequence. It can then be used for further downstream tasks like classification. The vector representations for all the other tokens in the output sequence are only used for token-level tasks like part-of-speech-tagging. Furthermore, a [SEP] token is added after each input sequence. With this technique, we can input two sequences as one into BERT which is used to perform the next sentence prediction task in the pre-training \cite{bert}.
 
 
 \subsubsection{RoBERTa}
@@ -37,12 +101,14 @@ RoBERTa is a LLM based on BERT \cite{roberta}. It improves BERT by
 	\item training on longer sequences,
 	\item dynamically changing the masking pattern.
 \end{enumerate}
+We are going to use RoBERTa as well since it is commonly used in the approaches described in \cite{argsvalidnovel2022}.
 
 \subsection{Gradient-Boosted Trees}
+To classify embeddings which will be created by our linking word probabilities, we are going to primarily use two different ways. The first one is a simple neural network as it is used as additional layer for BERT in a classification setting. The other one will be a Gradient-Boosted Tree. Besides its competitive classification performance, it can also be used to calculate the importance of used features. We will use this technique later on to increase training speed and make the model less vulnerable for overfitting by removing unimportant features. We decided not to use SHAP values \cite{shap} for feature importance simply due to simplicity. \\
 Gradient-Boosted Trees are a form of random forests. Both combine multiple decision trees to produce one classifier but they differ in building the individual trees and in combining them \cite{gradboost}. A decision tree splits the data at each node until the leaf nodes are reached. These leaf nodes nodes then correspond to a certain label. In gradient boosting, decision trees with only a few splits are constructed. These trees are then added together sequentially while minimizing a loss function when adding each tree.
 
-\subsubsection{XGBoost and LightGBM}
-XGBoost and LightGBM are both gradient boosting frameworks using decision trees which significantly improve the performance and training speed of standard gradient boosting algorithms \cite{xgboost, lgbm}.
+\subsubsection{LightGBM}
+LightGBM is a gradient boosting frameworks using decision trees which significantly improve the performance and training speed of standard gradient boosting algorithms \cite{lgbm}. We are going to use the lightgbm python package \cite{lgbmpython} for the implementation.
 
 \subsection{Evaluation Metrics}
 To evaluate our models, we need to define evaluation metrics. There are many different established metrics to use. In this section we will give an overview of the ones we are going to use along this thesis. These definitions are adapted from Hossin and Sulaiman \cite{metrics}.
@@ -86,26 +152,4 @@ The F1 score is the harmonic mean between recall and precision.
 	\text{F1} = \frac{2 \cdot P \cdot R}{P + R}
 \end{equation}
 
-\subsubsection{Multi-Class Metrics}
-In the case of stance classification, we have three classes instead of two. Therefore we have to adept the calculation of these evaluation metrics for the non-binary case. In the following definitions, let $C$ be the number of classes. \\
-
-\textbf{Averaged Recall} \\ \\
-Macro average of the per-class recall.
-
-\begin{equation}
-	R_M = \frac{\sum\limits_{i=1}^{C} \frac{TP_i}{TP_i + FN_i}}{C}
-\end{equation}
-
-\textbf{Averaged Precision} \\ \\
-Macro average of the per-class precision.
-
-\begin{equation}
-	P_M = \frac{\sum\limits_{i=1}^{C} \frac{TP_i}{TP_i + FP_i}}{C}
-\end{equation}
-
-\textbf{Averaged F1-Score} \\ \\
-The average of the per-class F1-Score.
-
-\begin{equation}
-	\text{F1} = \frac{2 \cdot P_M \cdot R_M}{P_M + R_M}
-\end{equation}
+To evaluate our models, we will only use the F1-Score to give a good comparison to similar works like the Validity and Novelty Prediction Shared Task \cite{argsvalnov2022}.
