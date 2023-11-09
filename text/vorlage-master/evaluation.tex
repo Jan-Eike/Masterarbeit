@@ -1,0 +1,100 @@
+\section{Evaluation}
+
+In this chapter, we will describe all the used model configurations and present their results for both validity classification and stance detection. Afterwards, we will discuss the results and investigate how they line up with our expectations.
+
+\subsection{Model Configurations}
+
+The main structure of all different models is based on the model in Figure \ref{fig:model-architecture_full}. In this section, we will describe the exact configurations of all used models.
+
+
+\begin{figure}[H]
+  \begin{center}
+  	\renewcommand{\arraystretch}{1.2}
+   	\begin{tabular}{|| l || c | c ||}
+   	\hline
+   	{\small Configuration} & {\small Neural Network Classifier} & {\small LightGBM Classifier} \\
+   	\hline\hline
+   	BERT + $L_1$ + $E_{Matrix}$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_1$ + $E_{Matrix}$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_1$ + $E$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_1$ + $E$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_2$ + $E_{Matrix}$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_2$ + $E_{Matrix}$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_2$ + $E$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_2$ + $E$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_1$ + $E_{Matrix}$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_1$ + $E_{Matrix}$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_1$ + $E$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_1$ + $E$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_2$ + $E_{Matrix}$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_2$ + $E_{Matrix}$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_2$ + $E$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_2$ + $E$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+	\end{tabular}
+	\renewcommand{\arraystretch}{1}
+  \end{center}
+  \caption{Evaluation results for validity classification.}%
+  \label{fig:validityresults}
+\end{figure}
+
+\begin{figure}[H]
+  \begin{center}
+  	\renewcommand{\arraystretch}{1.2}
+   	\begin{tabular}{|| l || c | c ||}
+   	\hline
+   	{\small Configuration} & {\small Neural Network Classifier} & {\small LightGBM Classifier} \\
+   	\hline\hline
+   	BERT + $L_1$ + $E_{Matrix}$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_1$ + $E_{Matrix}$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_1$ + $E$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_1$ + $E$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_2$ + $E_{Matrix}$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_2$ + $E_{Matrix}$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_2$ + $E$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	BERT + $L_2$ + $E$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_1$ + $E_{Matrix}$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_1$ + $E_{Matrix}$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_1$ + $E$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_1$ + $E$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_2$ + $E_{Matrix}$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_2$ + $E_{Matrix}$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_2$ + $E$ + $\textit{FE}^+$ & 0.84 & x \\
+ 	\hline
+ 	RoBERTa + $L_2$ + $E$ + $\textit{FE}^-$ & 0.84 & x \\
+ 	\hline
+	\end{tabular}
+	\renewcommand{\arraystretch}{1}
+  \end{center}
+  \caption{Evaluation results for stance detection.}%
+  \label{fig:stanceresults}
+\end{figure}

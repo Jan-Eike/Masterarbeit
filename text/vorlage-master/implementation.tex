@@ -1,0 +1,69 @@
+\section{Implementation}
+In this chapter, we will present all the used hardware and software to implement the models, as well as describing all the techniques and parameters we used for training and evaluation.
+
+\subsection{Hardware}
+All evaluations were run on the same hardware setup (\ref{fig:hardware1}).
+
+\begin{figure}[H]
+  \begin{center}
+   	\begin{tabular}{|| c | c ||}
+   	\hline
+   	Hardware name & Specific model \\
+   	\hline\hline
+   	CPU & AMD Ryzen 7 3700X \\
+ 	\hline
+ 	GPU & NVIDIA GeForce RTX 2070 SUPER 8GB \\
+ 	\hline
+ 	RAM & 32GB \\
+ 	\hline
+ 	Mainboard & ASUS ROG STRIX B450-F Gaming \\
+ 	\hline
+ 	System & Windows 10 (64-bit) \\
+ 	\hline
+	\end{tabular}
+  \end{center}
+  \caption{Hardware setup.}%
+  \label{fig:hardware1}
+\end{figure}
+
+\subsection{BERT and RoBERTa}
+For the implementation of both language models, we use the Huggingface Transformers framework \cite{transformers}. In particular, for BERT we are using the bert-base-uncased model \cite{bertbaseuncased} and for RoBERTa we are using roberta-base \cite{robertabase}. The framework provides a straightforward way to fine tune and evaluate these LMs on a GPU\cite{berttraining}. We are using the same way of fine tuning and evaluation. We are fine tuning for $3$ epochs with a learning rate of $5 \cdot 10^{-5}$, $100$ warm up steps and a batch size of $64$. For all the other parameters, we are using the standard parameters from the config.json file provided by both models. Both configurations are the same for the baseline models as well as the models used for masking. After fine tuning, we select the model with the highest f1-score achieved on the development dataset. \\
+The baseline models are directly evaluated on the test set and the masked LMs are used for calculating linking words probabilities as described in chapter 4.2.1.
+
+\subsection{LightGBM Classifier and Feature Extraction}
+To implement LightGBM, we are going to use the lightgbm python package \cite{lgbmpython}. Parameters are chosen based on the description given on the LightGBM website \cite{lgbmpython} and can be found in figure \ref{fig:lgbmparams}. We decided against extensive hyperparamter tuning since we generally did not achieve better performance with different configurations.
+
+\begin{figure}[H]
+  \begin{center}
+   	\begin{tabular}{|| c | c ||}
+   	\hline
+   	Parameter name & Parameter value \\
+   	\hline\hline
+   	boosting type & gbdt \\
+ 	\hline
+ 	objective & binary \\
+ 	\hline
+ 	metric & f1 \\
+ 	\hline
+ 	num leaves & 21 \\
+ 	\hline
+ 	learning rate & 0.05 \\
+ 	\hline
+ 	feature fraction & 0.9 \\
+ 	\hline
+ 	bagging fraction & 0.8 \\
+ 	\hline
+ 	bagging freq & 5 \\
+ 	\hline
+	\end{tabular}
+  \end{center}
+  \caption{LightGBM Parameters.}%
+  \label{fig:lgbmparams}
+\end{figure}
+
+We train all LightGBM models for $10000$ epochs with early stopping patience of $40$ epochs. The model with the highest f1-score on the dev set is then used for evaluation the test set. \\
+For feature extraction, we are doing a 5-fold cross validation, repeated two times, on the training set, using the same parameters for the LightGBM models as for classification. Afterwards, we sort the features by average importance extracted from the LightGBM models and discard all features with an average importance of less than $\frac{\text{average importance}}{4}$. We decided to use this value since a lot of features get a very low importance which drags down the average quite a bit and we do not want to discard too many features.
+
+
+\subsection{Neural Network Classifier}
+For the neural network classifiers, we are using pytorch \cite{pytorch} for implementation, training and evaluation. We train all classifiers for $200$ epochs with a learning rate of $2 \cdot 10^{-1}$, batch size of $32$ and an early stopping patience of $10$ epochs on a GPU. The model with the lowest loss on the dev set is then used for evaluation on the test set.

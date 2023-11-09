@@ -64,7 +64,7 @@ As hinted in the introduction, we will use language models to assign probabiliti
   \end{center}
   \centering
   \includegraphics[scale=0.9]{fig/bert_masking_example.png}
-  \caption{Example for masking of language models \cite{bertexample}. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
+  \caption{Example for masking of language models \cite{bertbaseuncased}, accessed 20-October-2023. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
   \label{fig:bert_masking_example}
 \end{figure}
 
@@ -76,7 +76,7 @@ We will present another example (see figure \ref{fig:bert_masking_example2}), sh
   \end{center}
   \centering
   \includegraphics[scale=0.9]{fig/bert_masking_example2.png}
-  \caption{Example for linking word masking of language models \cite{bertexample2}. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
+  \caption{Example for linking word masking of language models \cite{bertbaseuncased}, accessed 20-October-2023. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
   \label{fig:bert_masking_example2}
 \end{figure}
 
@@ -108,7 +108,7 @@ To classify embeddings which will be created by our linking word probabilities, 
 Gradient-Boosted Trees are a form of random forests. Both combine multiple decision trees to produce one classifier but they differ in building the individual trees and in combining them \cite{gradboost}. A decision tree splits the data at each node until the leaf nodes are reached. These leaf nodes nodes then correspond to a certain label. In gradient boosting, decision trees with only a few splits are constructed. These trees are then added together sequentially while minimizing a loss function when adding each tree.
 
 \subsubsection{LightGBM}
-LightGBM is a gradient boosting frameworks using decision trees which significantly improve the performance and training speed of standard gradient boosting algorithms \cite{lgbm}. We are going to use the lightgbm python package \cite{lgbmpython} for the implementation.
+LightGBM is a gradient boosting frameworks using decision trees which significantly improve the performance and training speed of standard gradient boosting algorithms \cite{lgbm}.
 
 \subsection{Evaluation Metrics}
 To evaluate our models, we need to define evaluation metrics. There are many different established metrics to use. In this section we will give an overview of the ones we are going to use along this thesis. These definitions are adapted from Hossin and Sulaiman \cite{metrics}.
