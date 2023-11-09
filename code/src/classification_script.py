@@ -36,14 +36,7 @@ DEVICE = "cuda:0"
 
 def load_all_datasets():
     # load premise conclusion data
-    train_dataset, test_dataset, val_dataset = load_data(["data/TaskA_train.csv", "data/TaskA_test.csv", "data/TaskA_dev.csv"])
-    #train_dataset_for_complete = train_dataset.to_pandas()
-    #test_dataset_for_complete = test_dataset.to_pandas()
-    #val_dataset_for_complete = val_dataset.to_pandas()
-    #complete_dataset = Dataset.from_pandas(pd.concat([train_dataset_for_complete, test_dataset_for_complete, val_dataset_for_complete], ignore_index=True))
-
-    #premise_conclusion_data = complete_dataset
-    premise_conclusion_data = train_dataset, test_dataset, val_dataset
+    premise_conclusion_data = load_data(["data/TaskA_train.csv", "data/TaskA_test.csv", "data/TaskA_dev.csv"])
 
     # load pretraining data
     pretraining_data = load_pretraining_data()
@@ -52,14 +45,7 @@ def load_all_datasets():
     chatGPT_data = load_chatGPT_data()
 
     # load arg quality data
-    train_arg_quality, test_arg_quality, val_arg_quality = load_arg_quality()
-    #train_arg_quality_complete = train_arg_quality.to_pandas()
-    #test_arg_quality_complete = test_arg_quality.to_pandas()
-    #val_arg_quality_complete = val_arg_quality.to_pandas()
-    #complete_arg_quality = Dataset.from_pandas(pd.concat([train_arg_quality_complete, test_arg_quality_complete, val_arg_quality_complete], ignore_index=True))
-
-    #arg_quality_data = complete_arg_quality
-    arg_quality_data = train_arg_quality, test_arg_quality, val_arg_quality
+    arg_quality_data = load_arg_quality()
 
     return premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data
 
@@ -229,30 +215,10 @@ def feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params):
     all_features = feature_importance_df[["feature", "importance"]].groupby("feature").mean().sort_values(by="importance", ascending=False)
     all_features.reset_index(inplace=True)
     important_features = all_features[all_features["importance"] > (all_features["importance"].mean()) // 4]["feature"]
-    print(all_features)
 
-
-    # Check feature correlation 
-    #df = x_train_dft[important_features]
-    #corr_matrix = df.corr().abs()
-
-    # Select upper triangle of correlation matrix
-    #upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
-
-    # Find index of feature columns with correlation greater than 0.95
-    #high_cor = [column for column in upper.columns if any(upper[column] > 0.95)]
-    #print(len(high_cor))
-    #print(high_cor)
-
-    #features = [i for i in important_features if i not in high_cor]
-    features = important_features
-    #features = [i for i in important_features]
-    #print(len(features))
-    #print(features)
-
-    x_train_dft = x_train_dft[features]
-    x_test_dft = x_test_dft[features]
-    x_dev_dft = x_dev_dft[features]
+    x_train_dft = x_train_dft[important_features]
+    x_test_dft = x_test_dft[important_features]
+    x_dev_dft = x_dev_dft[important_features]
 
     return x_train_dft, x_test_dft, x_dev_dft
 
@@ -313,7 +279,8 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     model = AutoModelForMaskedLM.from_pretrained(model_attributes.model_checkpoint, output_hidden_states=True).to(DEVICE)
     tokenizer = AutoTokenizer.from_pretrained(model_attributes.model_checkpoint)
     def tokenize_function(examples):
-        return tokenizer(examples["text"], padding="max_length", truncation=True)
+        #return tokenizer(examples["text"], padding="max_length", truncation=True)
+        return tokenizer(examples["text"], max_length=256, truncation=True, padding=True)
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
 
     premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data = load_all_datasets()
@@ -322,12 +289,12 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     premise_conclusion_train, premise_conclusion_test, premise_conclusion_dev = premise_conclusion_data
     train_pre_dataset, test_pre_dataset = train_test_split_custom(pretraining_data)
     train_pre_chatgpt_dataset, test_pre_chatgpt_dataset = train_test_split_custom(chatGPT_data)
-    #train_arg_quality, test_arg_quality, dev_arg_quality = train_test_dev_split(arg_quality_data)
     train_arg_quality, test_arg_quality, dev_arg_quality = arg_quality_data
     # tokenize premise conclusion data
     tokenized_train = premise_conclusion_train.map(tokenize_function, batched=True)
     tokenized_test = premise_conclusion_test.map(tokenize_function, batched=True)
     tokenized_dev = premise_conclusion_dev.map(tokenize_function, batched=True)
+    tokenized_complete = (tokenized_train, tokenized_dev, tokenized_test)
     # tokenize pretraining data
     tokenized_train_pre = train_pre_dataset.map(tokenize_function, batched=True)
     tokenized_test_pre = test_pre_dataset.map(tokenize_function, batched=True)
@@ -412,7 +379,6 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         saved = True
 
     from_dir = save if saved else load if load_prev else model_attributes.model_checkpoint
-    print(from_dir)
     if train and train_on_arg_quality:
         model = AutoModelForMaskedLM.from_pretrained(from_dir, output_hidden_states=True).to(DEVICE) # don't know if necessary
         trainer = transformers.Trainer(
@@ -575,8 +541,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "new",
     ]))
 
-    """
-    words = list(dict.fromkeys([
+    words3 = list(dict.fromkeys([
         "because",
         "although",
         "therefore",
@@ -599,7 +564,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "still",
         "and"
     ]))
-    """
+
     words2 = list(dict.fromkeys([
         x.lower() for x in [
             "Accordingly",
@@ -712,7 +677,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         ]
     ]))
 
-    words = list(dict.fromkeys(words1))
+    words = list(dict.fromkeys(words3))
 
     print(len(words))
     word_mapping = {word: i for i, word in enumerate(words)} # map words to numbers to sort them later
@@ -753,7 +718,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     y_train = np.array(list(zip(*embedding_train))[0])
     y_test = np.array(list(zip(*embedding_test))[0])
     y_dev = np.array(list(zip(*embedding_dev))[0])
+    labels = (y_train, y_dev, y_test)
 
+    # build DataFrames with words as columns for feature extraction
     x_train_df_orig = pd.DataFrame(x_train_orig, columns=words).astype("float32")
     x_test_df_orig = pd.DataFrame(x_test_orig, columns=words).astype("float32")
     x_dev_df_orig = pd.DataFrame(x_dev_orig, columns=words).astype("float32")
@@ -762,13 +729,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     y_test_df = pd.DataFrame(y_test).astype(int)
     y_dev_df = pd.DataFrame(y_dev).astype(int)
 
-    print(x_train_df_orig.shape, x_test_df_orig.shape, x_dev_df_orig.shape, y_train_df.shape, y_test_df.shape, y_dev_df.shape)
-
     bert_embeddings_train = bert_embeddings_train.squeeze()
     bert_embeddings_test = bert_embeddings_test.squeeze()
     bert_embeddings_dev = bert_embeddings_dev.squeeze()
-
-    print(bert_embeddings_train.shape, bert_embeddings_test.shape, bert_embeddings_dev.shape)
 
     params_lgbm = {
         'boosting_type': 'gbdt',
@@ -788,10 +751,11 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : len(words),
-        "batch_size" : 10,
-        "lr" : 1e-4, 
+        "batch_size" : 16,
+        "lr" : 2e-5, 
+        "patience" : 10,
         "seed" : 42, 
-        "epochs" : 40
+        "epochs" : 3
     }
     nn_classifier = Classifier(class_type="nn")
 
@@ -800,7 +764,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     ###############################################
 
     f1_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_df_orig, y_train_df, x_test_df_orig, y_test_df, x_dev_df_orig, y_dev_df, num_round)
-    f1_nn = nn_classifier.train_and_eval(params_nn, x_train_orig, y_train, x_test_orig, y_test)
+    f1_nn = nn_classifier.train_and_eval(params_nn, x_train_orig, y_train, x_dev_orig, y_dev, x_test_orig, y_test)
+    print(x_dev_orig.shape, labels[1].shape)
+    f1_nn_complete_training = nn_classifier.train_and_eval_nn_complete((x_train_orig, x_dev_orig, x_test_orig), labels, tokenized_complete, **params_nn)
 
     ############################################
     # NORMAL EMBEDDINGS WITH FEATURE SELECTION #
@@ -809,7 +775,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     x_train_df, x_test_df, x_dev_df = feature_extraction(x_train_df_orig, x_test_df_orig, x_dev_df_orig, y_train_df, params_lgbm)
 
     f1_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
-    f1_nn_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_test_df.to_numpy(), y_test)
+    f1_nn_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_dev_df.to_numpy(), y_dev, x_test_df.to_numpy(), y_test)
 
     ############################
     # CREATE MATRIX EMBEDDINGS #
@@ -821,10 +787,11 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : x_train_matrix.shape[1],
-        "batch_size" : 10,
-        "lr" : 1e-4, 
+        "batch_size" : 32,
+        "lr" : 2e-3, 
+        "patience" : 40,
         "seed" : 42, 
-        "epochs" : 15
+        "epochs" : 2000
     }
 
     ###############################################
@@ -832,7 +799,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     ###############################################
 
     f1_matrix_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_df, y_train_df, x_test_matrix_df, y_test_df, x_dev_matrix_df, y_dev_df, num_round)
-    f1_matrix_nn = nn_classifier.train_and_eval(params_nn, x_train_matrix, y_train, x_test_matrix, y_test)
+    f1_matrix_nn = nn_classifier.train_and_eval(params_nn, x_train_matrix, y_train, x_dev_matrix, y_dev, x_test_matrix, y_test)
 
     ############################################
     # MATRIX EMBEDDINGS WITH FEATURE SELECTION #
@@ -842,14 +809,15 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : x_train_matrix_df.to_numpy().shape[1],
-        "batch_size" : 10,
-        "lr" : 1e-4, 
+        "batch_size" : 32,
+        "lr" : 2e-3, 
+        "patience" : 40,
         "seed" : 42, 
-        "epochs" : 15
+        "epochs" : 2000
     }
 
     f1_matrix_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_df, y_train_df, x_test_matrix_df, y_test_df, x_dev_matrix_df, y_dev_df, num_round)
-    f1_matrix_nn_best = nn_classifier.train_and_eval(params_nn, x_train_matrix_df.to_numpy(), y_train, x_test_matrix_df.to_numpy(), y_test)
+    f1_matrix_nn_best = nn_classifier.train_and_eval(params_nn, x_train_matrix_df.to_numpy(), y_train, x_dev_matrix_df.to_numpy(), y_dev, x_test_matrix_df.to_numpy(), y_test)
 
     ##################################################
     # BERT EMBEDDINGS ONLY WITHOUT FEATURE SELECTION #
@@ -861,14 +829,15 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : bert_embeddings_train.shape[1],
-        "batch_size" : 10,
-        "lr" : 1e-4, 
+        "batch_size" : 32,
+        "lr" : 2e-3, 
+        "patience" : 40,
         "seed" : 42, 
-        "epochs" : 15
+        "epochs" : 2000
     }
 
     f1_bert_only_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
-    f1_bert_only_nn = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_test_df.to_numpy(), y_test)
+    f1_bert_only_nn = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_dev_df.to_numpy(), y_dev, x_test_df.to_numpy(), y_test)
 
     ##################################################
     # COMBINE BERT EMBEDDINGS WITH NORMAL EMBEDDINGS #
@@ -885,10 +854,11 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : x_train_bert.shape[1],
-        "batch_size" : 10,
-        "lr" : 1e-4, 
+        "batch_size" : 32,
+        "lr" : 2e-3, 
+        "patience" : 40,
         "seed" : 42, 
-        "epochs" : 15
+        "epochs" : 2000
     }
 
     ####################################################################
@@ -896,7 +866,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     ####################################################################
 
     f1_bert_normal_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_bert_df, y_train_df, x_test_bert_df, y_test_df, x_dev_bert_df, y_dev_df, num_round)
-    f1_bert_normal_nn = nn_classifier.train_and_eval(params_nn, x_train_bert, y_train, x_test_bert, y_test)
+    f1_bert_normal_nn = nn_classifier.train_and_eval(params_nn, x_train_bert, y_train, x_dev_bert, y_dev, x_test_bert, y_test)
 
     #################################################################
     # BERT EMBEDDINGS WITH NORMAL EMBEDDINGS WITH FEATURE SELECTION #
@@ -906,14 +876,15 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : x_train_df.to_numpy().shape[1],
-        "batch_size" : 10,
-        "lr" : 1e-4, 
+        "batch_size" : 32,
+        "lr" : 2e-3, 
+        "patience" : 40,
         "seed" : 42, 
-        "epochs" : 15
+        "epochs" : 2000
     }
 
     f1_bert_lgbm_normal_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
-    f1_bert_nn_normal_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_test_df.to_numpy(), y_test)
+    f1_bert_nn_normal_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_dev_df.to_numpy(), y_dev, x_test_df.to_numpy(), y_test)
 
     ##################################################
     # COMBINE BERT EMBEDDINGS WITH MATRIX EMBEDDINGS #
@@ -930,10 +901,11 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : x_train_matrix_bert.shape[1],
-        "batch_size" : 10,
-        "lr" : 1e-4, 
+        "batch_size" : 32,
+        "lr" : 2e-3, 
+        "patience" : 40,
         "seed" : 42, 
-        "epochs" : 15
+        "epochs" : 2000
     }
 
     ####################################################################
@@ -941,7 +913,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     ####################################################################
     
     f1_bert_matrix_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_bert_df, y_train_df, x_test_matrix_bert_df, y_test_df, x_dev_matrix_bert_df, y_dev_df, num_round)
-    f1_bert_matrix_nn = nn_classifier.train_and_eval(params_nn, x_train_matrix_bert, y_train, x_test_matrix_bert, y_test)
+    f1_bert_matrix_nn = nn_classifier.train_and_eval(params_nn, x_train_matrix_bert, y_train, x_dev_matrix_bert, y_dev, x_test_matrix_bert, y_test)
 
     #################################################################
     # BERT EMBEDDINGS WITH MATRIX EMBEDDINGS WITH FEATURE SELECTION #
@@ -951,14 +923,15 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : x_train_df.to_numpy().shape[1],
-        "batch_size" : 10,
-        "lr" : 1e-4, 
+        "batch_size" : 32,
+        "lr" : 2e-3, 
+        "patience" : 40,
         "seed" : 42, 
-        "epochs" : 15
+        "epochs" : 2000
     }
 
     f1_bert_matrix_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
-    f1_bert_matrix_nn_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_test_df.to_numpy(), y_test)
+    f1_bert_matrix_nn_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_dev_df.to_numpy(), y_dev, x_test_df.to_numpy(), y_test)
 
     #################################################################
 
@@ -992,9 +965,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
 if __name__ == "__main__":
     #model_attributes = ModelAttributes("bert-base-uncased")
-    model_attributes = ModelAttributes("roberta-base")
+    model_attributes = ModelAttributes("bert-base-uncased")
 
-    load = "./models/run_7_config_1001001011"
+    load = "./models/run_15_config_0110000110"
     Path(load).mkdir(parents=True, exist_ok=True)
 
     # load and read boolean arguments from the config file
@@ -1003,7 +976,7 @@ if __name__ == "__main__":
     all_bool_args = [True if config.get('BooleanArgs',i) == "True" else False for i in config['BooleanArgs']]
     
     save_suffix = "".join([str(int(i)) for i in all_bool_args])
-    save = "./models/run_10_config_" + save_suffix
+    save = "./models/run_16_config_" + save_suffix
     print(save)
 
     Path(save).mkdir(parents=True, exist_ok=True)
