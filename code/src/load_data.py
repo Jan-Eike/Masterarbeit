@@ -85,3 +85,19 @@ def load_arg_quality(file="data/arg_quality_rank_30k.csv"):
     val_df = Dataset.from_pandas(df[df["set"] == "dev"].drop(["set"], axis=1))
 
     return train_df, test_df, val_df
+
+
+def load_all_datasets():
+    # load premise conclusion data
+    premise_conclusion_data = load_data(["data/TaskA_train.csv", "data/TaskA_test.csv", "data/TaskA_dev.csv"])
+
+    # load pretraining data
+    pretraining_data = load_pretraining_data()
+
+    # load chatgpt data
+    chatGPT_data = load_chatGPT_data()
+
+    # load arg quality data
+    arg_quality_data = load_arg_quality()
+
+    return premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data

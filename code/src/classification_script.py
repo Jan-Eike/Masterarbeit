@@ -6,66 +6,28 @@ import numpy as np
 import lightgbm as lgb
 import pandas as pd
 from pathlib import Path
-from datasets import Dataset, DatasetDict
-from torch import nn, Tensor
-from torch.utils.data import DataLoader, TensorDataset
+from datasets import DatasetDict
 from model_attributes import ModelAttributes
 from tqdm import tqdm
 from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import KFold
 from sklearn.model_selection import RepeatedKFold
-from sklearn.metrics import mean_squared_error
 from concurrent.futures import ProcessPoolExecutor
 from classifier import Classifier
+from load_data import load_all_datasets
 from transformers import (
     DataCollatorForLanguageModeling,
     IntervalStrategy, 
     AutoTokenizer,
     AutoModelForMaskedLM,
-    BertForSequenceClassification
+    BertForSequenceClassification,
+    set_seed
 )
-from load_data import (
-    load_data, 
-    load_pretraining_data, 
-    load_chatGPT_data,
-    load_arg_quality
+from utils import (
+    compute_metrics,
+    preprocess_logits_for_metrics,
+    lgb_f1_score
 )
-DEVICE = "cuda:0"
-
-
-def load_all_datasets():
-    # load premise conclusion data
-    premise_conclusion_data = load_data(["data/TaskA_train.csv", "data/TaskA_test.csv", "data/TaskA_dev.csv"])
-
-    # load pretraining data
-    pretraining_data = load_pretraining_data()
-
-    # load chatgpt data
-    chatGPT_data = load_chatGPT_data()
-
-    # load arg quality data
-    arg_quality_data = load_arg_quality()
-
-    return premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data
-
-
-def compute_metrics(p):    
-    preds, labels = p
-    f1 = f1_score(y_true=labels, y_pred=preds)
-    return {"f1": f1} 
-
-
-def preprocess_logits_for_metrics(logits, labels):
-    """
-    Original Trainer may have a memory leak. 
-    This is a workaround to avoid storing too many tensors that are not needed.
-    """
-    if isinstance(logits, tuple):
-        # Depending on the model and config, logits may contain extra tensors,
-        # like past_key_values, but logits always come first
-        logits = logits[0]
-    return logits.argmax(dim=-1)
+DEVICE = "cuda:0" 
 
 
 def mean_pooling(model_output):
@@ -73,6 +35,7 @@ def mean_pooling(model_output):
     sum_embeddings = torch.sum(model_output, 1)
     pooled_embeddings = sum_embeddings / size
     return pooled_embeddings
+
 
 def extract_bert_embeddings(dataset, tokenizer, model):
     model = model.to("cpu")
@@ -223,12 +186,6 @@ def feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params):
     return x_train_dft, x_test_dft, x_dev_dft
 
 
-def lgb_f1_score(y_hat, data):
-    y_true = data.get_label()
-    y_hat = np.round(y_hat) # scikits f1 doesn't like probabilities, also not sure about just rounding...
-    return 'f1', f1_score(y_true, y_hat, average='macro'), True
-
-
 def train_test_split_custom(data, train_size=0.8):
     train_test = data.train_test_split(shuffle=True, seed=200, test_size=1-train_size)
     return train_test['train'], train_test['test']
@@ -268,8 +225,9 @@ def create_matrix_embedding(embedding, words):
     return matrix_embedding, matrix_embedding_df
 
 
-def train_loop(save_i, model_attributes, load, save, all_bool_args):
+def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, all_bool_args):
     load_prev, train, train_on_premise_conclusion, train_on_arg_quality, pretrain, load_embedding, stance, baseline, calc_bert_embeddings, load_bert_embeddings = all_bool_args
+    set_seed(seed)
     # save location for each loop
     save = save + f"/{save_i}"
     load = load + f"/{save_i}"
@@ -280,7 +238,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     tokenizer = AutoTokenizer.from_pretrained(model_attributes.model_checkpoint)
     def tokenize_function(examples):
         #return tokenizer(examples["text"], padding="max_length", truncation=True)
-        return tokenizer(examples["text"], max_length=256, truncation=True, padding=True)
+        return tokenizer(examples["text"], max_length=512, truncation=True, padding=True)
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
 
     premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data = load_all_datasets()
@@ -426,7 +384,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         trainer.train()
         trainer.model.eval()
         baseline_scores = trainer.evaluate(eval_dataset=tokenized_test)
-        print(baseline_scores)
+        print("Baseline test f1: {}".format(baseline_scores["eval_f1"]))
         trainer.save_model(output_dir=save+"/LM_classification")
     else:
         #model_class = BertForSequenceClassification.from_pretrained(load + "/LM_classification", num_labels=2, output_hidden_states=True).to(DEVICE)
@@ -436,248 +394,12 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     model = model.to("cpu")
 
     #words = ["t"herefore", "consequently", "hence", "thus", "so", "nevertheless", "however", "yet", "anyway", "although"]
-    #words = ["t"he", "a", "hence", "thus", "and", "this", "he", "she", "it", "yet", "be", "to", "that", "for", "as", "have", "but", "by", "from", "say", "his", "her", "its", "with", "will", "can", "of", "in", "i", "not"]
+    
+    with open("./src/linking_words.json", "r") as file:
+        data = json.load(file) 
 
-    words1 = list(dict.fromkeys([
-        "the",
-        "be",
-        "and",
-        "a",
-        "of",
-        "to",
-        "in",
-        "i",
-        "you",
-        "it",
-        "have",
-        "to",
-        "that",
-        "for",
-        "do",
-        "he",
-        "with",
-        "on",
-        "this",
-        "therefore",
-        "we",
-        "that",
-        "not",
-        "but",
-        "they",
-        "say",
-        "at",
-        "what",
-        "his",
-        "from",
-        "go",
-        "or",
-        "by",
-        "get",
-        "she",
-        "my",
-        "can",
-        "as",
-        "know",
-        "if",
-        "me",
-        "your",
-        "all",
-        "who",
-        "about",
-        "their",
-        "will",
-        "so",
-        "would",
-        "make",
-        "just",
-        "up",
-        "think",
-        "time",
-        "there",
-        "see",
-        "her",
-        "as",
-        "out",
-        "one",
-        "come",
-        "people",
-        "take",
-        "year",
-        "him",
-        "them",
-        "some",
-        "want",
-        "how",
-        "when",
-        "which",
-        "now",
-        "like",
-        "other",
-        "could",
-        "our",
-        "into",
-        "here",
-        "then",
-        "than",
-        "look",
-        "way",
-        "more",
-        "these",
-        "no",
-        "thing",
-        "well",
-        "because",
-        "also",
-        "two",
-        "use",
-        "tell",
-        "good",
-        "first",
-        "man",
-        "day",
-        "find",
-        "give",
-        "more",
-        "new",
-    ]))
-
-    words3 = list(dict.fromkeys([
-        "because",
-        "although",
-        "therefore",
-        "but",
-        "still",
-        "whereas",
-        "while",
-        "however",
-        "since",
-        "therefore",
-        "as",
-        "for",
-        "consequently",
-        "hence",
-        "thus",
-        "so",
-        "nevertheless",
-        "yet",
-        "anyway",
-        "still",
-        "and"
-    ]))
-
-    words2 = list(dict.fromkeys([
-        x.lower() for x in [
-            "Accordingly",
-            "Consequently",
-            "Hence",
-            "Then",
-            "Therefore",
-            "Thus",
-            "Absolutely",
-            "Chiefly",
-            "Clearly",
-            "Definitely",
-            "Especially",
-            "Even",
-            "Importantly",
-            "Indeed",
-            "Naturally",
-            "Never",
-            "Obviously",
-            "Particularly",
-            "Positively",
-            "Surprisingly",
-            "Truly",
-            "Undoubtedly",
-            "Additionally",
-            "Also",
-            "And",
-            "Besides",
-            "Finally",
-            "First",
-            "Further",
-            "Furthermore",
-            "Last",
-            "Moreover",
-            "Second",
-            "Third",
-            "Too",
-            "Including",
-            "Like",
-            "Namely",
-            "Specifically",
-            "Alternatively",
-            "Conversely",
-            "However",
-            "Instead",
-            "Nevertheless",
-            "Nonetheless",
-            "Nor",
-            "Notwithstanding",
-            "Rather",
-            "Though",
-            "Unlike",
-            "Whereas",
-            "While",
-            "Yet",
-            "Alike",
-            "Both",
-            "Either",
-            "Equal",
-            "Equally",
-            "Likewise",
-            "Resembles",
-            "Similarly",
-            "Altogether",
-            "Briefly",
-            "Overall",
-            "Therefore",
-            "Ultimately",
-            "As",
-            "If",
-            "Since",
-            "Then",
-            "Unless",
-            "When",
-            "Whenever",
-            "While",
-            "Lest",
-            "Concerning",
-            "Considering",
-            "Regarding",
-            "Alternatively",
-            "Namely",
-            "Reiterated",
-            "Regularly",
-            "Typically",
-            "Mostly",
-            "Normally",
-            "Often",
-            "Commonly",
-            "because",
-            "although",
-            "therefore",
-            "but",
-            "still",
-            "whereas",
-            "while",
-            "however",
-            "since",
-            "therefore",
-            "as",
-            "for",
-            "consequently",
-            "hence",
-            "thus",
-            "so",
-            "nevertheless",
-            "yet",
-            "anyway",
-            "still"
-        ]
-    ]))
-
-    words = list(dict.fromkeys(words3))
+    linking_word_list = f"list{linking_word_index}"
+    words = list(dict.fromkeys(x.lower() for x in data[linking_word_list]))
 
     print(len(words))
     word_mapping = {word: i for i, word in enumerate(words)} # map words to numbers to sort them later
@@ -718,7 +440,6 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     y_train = np.array(list(zip(*embedding_train))[0])
     y_test = np.array(list(zip(*embedding_test))[0])
     y_dev = np.array(list(zip(*embedding_dev))[0])
-    labels = (y_train, y_dev, y_test)
 
     # build DataFrames with words as columns for feature extraction
     x_train_df_orig = pd.DataFrame(x_train_orig, columns=words).astype("float32")
@@ -751,11 +472,11 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     params_nn = {
         "input_length" : len(words),
-        "batch_size" : 16,
-        "lr" : 2e-5, 
+        "batch_size" : 32,
+        "lr" : 2e-3, 
         "patience" : 10,
-        "seed" : 42, 
-        "epochs" : 3
+        "seed" : seed,
+        "epochs" : 200
     }
     nn_classifier = Classifier(class_type="nn")
 
@@ -765,8 +486,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     f1_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_df_orig, y_train_df, x_test_df_orig, y_test_df, x_dev_df_orig, y_dev_df, num_round)
     f1_nn = nn_classifier.train_and_eval(params_nn, x_train_orig, y_train, x_dev_orig, y_dev, x_test_orig, y_test)
-    print(x_dev_orig.shape, labels[1].shape)
-    f1_nn_complete_training = nn_classifier.train_and_eval_nn_complete((x_train_orig, x_dev_orig, x_test_orig), labels, tokenized_complete, **params_nn)
+    f1_nn_complete = (nn_classifier.train_and_eval_nn_complete((x_train_orig, x_dev_orig, x_test_orig), save, tokenized_complete, seed, params_nn["input_length"], model_attributes))
 
     ############################################
     # NORMAL EMBEDDINGS WITH FEATURE SELECTION #
@@ -776,6 +496,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     f1_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
     f1_nn_best = nn_classifier.train_and_eval(params_nn, x_train_df.to_numpy(), y_train, x_dev_df.to_numpy(), y_dev, x_test_df.to_numpy(), y_test)
+    f1_nn_best_complete = nn_classifier.train_and_eval_nn_complete((x_train_df.to_numpy(), x_dev_df.to_numpy(), x_test_df.to_numpy()), save, tokenized_complete, seed, params_nn["input_length"], model_attributes)
 
     ############################
     # CREATE MATRIX EMBEDDINGS #
@@ -789,9 +510,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "input_length" : x_train_matrix.shape[1],
         "batch_size" : 32,
         "lr" : 2e-3, 
-        "patience" : 40,
-        "seed" : 42, 
-        "epochs" : 2000
+        "patience" : 10,
+        "seed" : seed,
+        "epochs" : 200
     }
 
     ###############################################
@@ -800,6 +521,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
     f1_matrix_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_df, y_train_df, x_test_matrix_df, y_test_df, x_dev_matrix_df, y_dev_df, num_round)
     f1_matrix_nn = nn_classifier.train_and_eval(params_nn, x_train_matrix, y_train, x_dev_matrix, y_dev, x_test_matrix, y_test)
+    f1_matrix_nn_complete = nn_classifier.train_and_eval_nn_complete((x_train_matrix, x_dev_matrix, x_test_matrix), save, tokenized_complete, seed, params_nn["input_length"], model_attributes)
 
     ############################################
     # MATRIX EMBEDDINGS WITH FEATURE SELECTION #
@@ -811,13 +533,14 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "input_length" : x_train_matrix_df.to_numpy().shape[1],
         "batch_size" : 32,
         "lr" : 2e-3, 
-        "patience" : 40,
-        "seed" : 42, 
-        "epochs" : 2000
+        "patience" : 10,
+        "seed" : seed,
+        "epochs" : 200
     }
 
     f1_matrix_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_df, y_train_df, x_test_matrix_df, y_test_df, x_dev_matrix_df, y_dev_df, num_round)
     f1_matrix_nn_best = nn_classifier.train_and_eval(params_nn, x_train_matrix_df.to_numpy(), y_train, x_dev_matrix_df.to_numpy(), y_dev, x_test_matrix_df.to_numpy(), y_test)
+    f1_matrix_nn_best_complete = nn_classifier.train_and_eval_nn_complete((x_train_matrix_df.to_numpy(), x_dev_matrix_df.to_numpy(), x_test_matrix_df.to_numpy()), save, tokenized_complete, seed, params_nn["input_length"], model_attributes)
 
     ##################################################
     # BERT EMBEDDINGS ONLY WITHOUT FEATURE SELECTION #
@@ -831,9 +554,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "input_length" : bert_embeddings_train.shape[1],
         "batch_size" : 32,
         "lr" : 2e-3, 
-        "patience" : 40,
-        "seed" : 42, 
-        "epochs" : 2000
+        "patience" : 10,
+        "seed" : seed,
+        "epochs" : 200
     }
 
     f1_bert_only_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
@@ -856,9 +579,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "input_length" : x_train_bert.shape[1],
         "batch_size" : 32,
         "lr" : 2e-3, 
-        "patience" : 40,
-        "seed" : 42, 
-        "epochs" : 2000
+        "patience" : 10, 
+        "seed" : seed,
+        "epochs" : 200
     }
 
     ####################################################################
@@ -878,9 +601,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "input_length" : x_train_df.to_numpy().shape[1],
         "batch_size" : 32,
         "lr" : 2e-3, 
-        "patience" : 40,
-        "seed" : 42, 
-        "epochs" : 2000
+        "patience" : 10,
+        "seed" : seed,
+        "epochs" : 200
     }
 
     f1_bert_lgbm_normal_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
@@ -903,9 +626,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "input_length" : x_train_matrix_bert.shape[1],
         "batch_size" : 32,
         "lr" : 2e-3, 
-        "patience" : 40,
-        "seed" : 42, 
-        "epochs" : 2000
+        "patience" : 10,
+        "seed" : seed,
+        "epochs" : 200
     }
 
     ####################################################################
@@ -914,6 +637,7 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
     
     f1_bert_matrix_lgbm = lgbm_classifier.train_and_eval(params_lgbm, x_train_matrix_bert_df, y_train_df, x_test_matrix_bert_df, y_test_df, x_dev_matrix_bert_df, y_dev_df, num_round)
     f1_bert_matrix_nn = nn_classifier.train_and_eval(params_nn, x_train_matrix_bert, y_train, x_dev_matrix_bert, y_dev, x_test_matrix_bert, y_test)
+    f1_bert_matrix_nn_complete = nn_classifier.train_and_eval_nn_complete((x_train_matrix_bert, x_dev_matrix_bert, x_test_matrix_bert), save, tokenized_complete, seed, params_nn["input_length"], model_attributes)
 
     #################################################################
     # BERT EMBEDDINGS WITH MATRIX EMBEDDINGS WITH FEATURE SELECTION #
@@ -925,9 +649,9 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "input_length" : x_train_df.to_numpy().shape[1],
         "batch_size" : 32,
         "lr" : 2e-3, 
-        "patience" : 40,
-        "seed" : 42, 
-        "epochs" : 2000
+        "patience" : 10,
+        "seed" : seed,
+        "epochs" : 200
     }
 
     f1_bert_matrix_lgbm_best = lgbm_classifier.train_and_eval(params_lgbm, x_train_df, y_train_df, x_test_df, y_test_df, x_dev_df, y_dev_df, num_round)
@@ -954,8 +678,14 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
         "f1_bert_matrix_nn" : f1_bert_matrix_nn,
         "f1_bert_matrix_lgbm_best" : f1_bert_matrix_lgbm_best,
         "f1_bert_matrix_nn_best" : f1_bert_matrix_nn_best,
-        "baseline_scores" : baseline_scores
+        "baseline_scores" : baseline_scores["eval_f1"],
+        "f1_nn_complete" : f1_nn_complete,
+        "f1_nn_best_complete" : f1_nn_best_complete,
+        "f1_matrix_nn_complete" : f1_matrix_nn_complete,
+        "f1_matrix_nn_best_complete" : f1_matrix_nn_best_complete,
+        "f1_bert_matrix_nn_complete" : f1_bert_matrix_nn_complete      
     }
+
     print(final_scores)
     with open(save + "/scores.json", "w", encoding="utf8") as f:
         json.dump(final_scores, f)
@@ -964,10 +694,11 @@ def train_loop(save_i, model_attributes, load, save, all_bool_args):
 
 
 if __name__ == "__main__":
-    #model_attributes = ModelAttributes("bert-base-uncased")
     model_attributes = ModelAttributes("bert-base-uncased")
+    seed = 42
+    linking_word_index = 1
 
-    load = "./models/run_15_config_0110000110"
+    load = "./models/run_13_config_0110000110"
     Path(load).mkdir(parents=True, exist_ok=True)
 
     # load and read boolean arguments from the config file
@@ -976,13 +707,24 @@ if __name__ == "__main__":
     all_bool_args = [True if config.get('BooleanArgs',i) == "True" else False for i in config['BooleanArgs']]
     
     save_suffix = "".join([str(int(i)) for i in all_bool_args])
-    save = "./models/run_16_config_" + save_suffix
+    save = "./models/run_18_config_" + save_suffix
     print(save)
 
     Path(save).mkdir(parents=True, exist_ok=True)
 
     scores = []
-    for i in range(1):
-        scores.append(train_loop(i, model_attributes, load, save, all_bool_args))
+    for i in range(3):
+        seed += i
+        scores.append(train_loop(i, model_attributes, load, save, seed, linking_word_index, all_bool_args))
 
     print(scores)
+    
+    keys = scores[0].keys()
+    values = np.array([list(dictx.values()) for dictx in scores])
+    mean_values = list(np.mean(values, axis=0))
+    average_scores = dict(zip(keys, mean_values))
+
+    print(average_scores)
+
+    with open(save + "/scores.json", "w", encoding="utf8") as f:
+        json.dump(average_scores, f)
