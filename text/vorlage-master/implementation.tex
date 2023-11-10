@@ -26,8 +26,8 @@ All evaluations were run on the same hardware setup (\ref{fig:hardware1}).
   \label{fig:hardware1}
 \end{figure}
 
-\subsection{BERT and RoBERTa}
-For the implementation of both language models, we use the Huggingface Transformers framework \cite{transformers}. In particular, for BERT we are using the bert-base-uncased model \cite{bertbaseuncased} and for RoBERTa we are using roberta-base \cite{robertabase}. The framework provides a straightforward way to fine tune and evaluate these LMs on a GPU\cite{berttraining}. We are using the same way of fine tuning and evaluation. We are fine tuning for $3$ epochs with a learning rate of $5 \cdot 10^{-5}$, $100$ warm up steps and a batch size of $64$. For all the other parameters, we are using the standard parameters from the config.json file provided by both models. Both configurations are the same for the baseline models as well as the models used for masking. After fine tuning, we select the model with the highest f1-score achieved on the development dataset. \\
+\subsection{BERT and RoBERTa} \label{sec:secbert}
+For the implementation of both language models, we use the Huggingface Transformers framework \cite{transformers}. In particular, for BERT we are using the bert-base-uncased model \cite{bertbaseuncased} and for RoBERTa we are using roberta-base \cite{robertabase}. The framework provides a straightforward way to fine tune and evaluate these LMs on a GPU \cite{berttraining}. We are using the same way of fine tuning and evaluation. We are fine tuning for $3$ epochs with a learning rate of $5 \cdot 10^{-5}$, $100$ warm up steps and a batch size of $64$. For all the other parameters, we are using the standard parameters from the config.json file provided by both models. Both configurations are the same for the baseline models as well as the models used for masking. After fine tuning, we select the model with the highest f1-score achieved on the development dataset. \\
 The baseline models are directly evaluated on the test set and the masked LMs are used for calculating linking words probabilities as described in chapter 4.2.1.
 
 \subsection{LightGBM Classifier and Feature Extraction}
@@ -67,3 +67,7 @@ For feature extraction, we are doing a 5-fold cross validation, repeated two tim
 
 \subsection{Neural Network Classifier}
 For the neural network classifiers, we are using pytorch \cite{pytorch} for implementation, training and evaluation. We train all classifiers for $200$ epochs with a learning rate of $2 \cdot 10^{-1}$, batch size of $32$ and an early stopping patience of $10$ epochs on a GPU. The model with the lowest loss on the dev set is then used for evaluation on the test set.
+
+\subsection{Complete Training vs. individual Training}
+In the sections before, we explained how we trained the LMs and classifiers individually, i.e. training the LMs first, concatenating their outputs with the linking words embeddings and train a classifier on these combined embeddings afterwards. In this section, we will give a quick overview on a different approach in which we trained the LMs and classifiers (in this case only the neural network classifier) together. \\
+For the implementation, we use the same frameworks as before but instead of training them separately, we build one model using pytorch which consists of the parts shown in Figure \ref{fig:model-architecture1} and train that in one go using the Huggingface Transformers framework. We use the same hyperparameters as for training the LMs separately (\ref{sec:secbert}).

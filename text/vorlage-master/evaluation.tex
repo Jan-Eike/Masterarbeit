@@ -2,12 +2,22 @@
 
 In this chapter, we will describe all the used model configurations and present their results for both validity classification and stance detection. Afterwards, we will discuss the results and investigate how they line up with our expectations.
 
-\subsection{Model Configurations}
+\subsection{Model Configurations and Results}
 
-The main structure of all different models is based on the model in Figure \ref{fig:model-architecture_full}. In this section, we will describe the exact configurations of all used models.
+The main structure of all different models is based on the model in Figure \ref{fig:model-architecture_full}. In this section, we will describe the exact configurations of all used models. \\
+To describe each configuration, we are going to recap all the steps and give them a label.
+\begin{itemize}
+	\item Used model $\in \{\text{BERT}, \text{RoBERTa}\}$.
+	\item Used classifier $\in \{\text{Neural Network Classifier}, \text{LightGBM Classifier}\}$.
+	\item Used set of linking words $\in \{L_1, L_2, L_3\}$. The entire linking word sets can be found in the appendix.
+	\item Used embeddings $\in \{E, E_{Matrix}\}$. With $E_{Matrix}$ being the matrix embeddings and $E$ the normal linking words embeddings.
+	\item Feature Extraction $\in \{\textit{FE}^+, \textit{FE}^-\}$. With $\textit{FE}^+$ meaning with feature extraction and $\textit{FE}^-$ without.
+\end{itemize}
+With these labels in mind, we present the classification results in two tables, Table \ref{fig:validityresults} corresponding to the results for validity classification and Table \ref{fig:stanceresults} corresponding to the results for stance detection. All models used in these tables are trained with the individual training approach.
 
 
-\begin{figure}[H]
+
+\begin{table}[H]
   \begin{center}
   	\renewcommand{\arraystretch}{1.2}
    	\begin{tabular}{|| l || c | c ||}
@@ -51,9 +61,9 @@ The main structure of all different models is based on the model in Figure \ref{
   \end{center}
   \caption{Evaluation results for validity classification.}%
   \label{fig:validityresults}
-\end{figure}
+\end{table}
 
-\begin{figure}[H]
+\begin{table}[H]
   \begin{center}
   	\renewcommand{\arraystretch}{1.2}
    	\begin{tabular}{|| l || c | c ||}
@@ -97,4 +107,4 @@ The main structure of all different models is based on the model in Figure \ref{
   \end{center}
   \caption{Evaluation results for stance detection.}%
   \label{fig:stanceresults}
-\end{figure}
+\end{table}
