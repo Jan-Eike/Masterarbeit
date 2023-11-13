@@ -5,7 +5,7 @@ We will start by defining the main tasks and continue with describing all the us
 \subsection{Tasks}
 We are going to evaluate our approaches on the two following tasks.
 
-\subsubsection{Validity Classification}
+\subsubsection{Validity Classification} \label{sec:validity}
 As described in \cite{argsvalidnovel2022}, a conclusion of a premise is considered valid if it follows naturally from its premise. In our case, a premise is a statement consisting of at least one sentence regarding a certain topic and a conclusion consists of exactly one sentence that sums up the premise.\\
 Following this definition, validity classification is a binary classification task in which we want to determine whether a conclusion is valid, given its premise. The label $1$ corresponds to a valid conclusion and the label $0$ to an invalid conclusion \cite{argsvalidnovel2022}. An example is shown in figure \ref{fig:val_class1}.
 
@@ -50,10 +50,14 @@ Our second main tasks is called stance detection. It is a classification task in
 As described in the beginning, we will use the probabilities of linking words to be at a certain position in a text to create additional features for our classifiers. We will use different lists of linking words as well as a list of words which are not necessarily considered linking words. The main list of linking words is the following:
 
 \begin{center}
-	[because, although, therefore, but, still, whereas, while, however, since, therefore, as, for, consequently, hence, thus, so, nevertheless, yet, anyway, still, and]
+	$L_1$ = [because, although, therefore, but, still, whereas, while, however, since, as, for, consequently, hence, thus, so, nevertheless, yet, anyway, and]
 \end{center}
 
-The other lists can be found in the appendix.
+The chosen list is composed of words that indicate a conclusion, like "therefore" or "hence", words that indicate a contradiction like "yet" or "but" and the word "and". To compare our results later on, we decided to use a second list which consists of the $19$ most common English words \cite{mostcommon}:
+\begin{center}
+	$L_2$ = [the, be, to, of, and, a, in, that, have, I, it, for, not, on, with, he, as, you, do]
+\end{center}
+Comparing the results for both lists can give us more insight about whether or not the words in these lists actually play a role or not. We also added a list with $100$ linking words and one list with the $100$ most common English words to further compare the influence of these words. Both of these lists can be found in the appendix.
 
 \subsection{Language Models}
 As hinted in the introduction, we will use language models to assign probabilities to linking words at certain positions in a text. A language model (LM) is a model that assigns probabilities to sequences of words \cite{languagemodels2023}. There are various types of LMs, achieving better performances in different areas. Especially since the release of ChatGPT \cite{chatgpt}, autoregressive models like GPT-3 have become very popular. These models assign probabilities to words, based on the context before the word and therefore generate one word after another based on these probabilities to generate text \cite{gpt3}. Other models, like BERT \cite{bert}, use a bidirectional approach which we will explain in detail in the next part. These bidirectional models are able to predict a masked word from a sentence, based on its left and right context. The model will then return a set of words and their corresponding probabilities to fill this [MASK] token \cite{bert}, as shown in figure \ref{fig:bert_masking_example}.
@@ -94,7 +98,7 @@ Most importantly, for every input sequence, a special [CLS] token will be added 
 
 
 \subsubsection{RoBERTa}
-RoBERTa is a LLM based on BERT \cite{roberta}. It improves BERT by
+RoBERTa is a LLM that has the same architecture as BERT \cite{roberta}. It improves BERT by
 \begin{enumerate}
 	\item longer training with more data,
 	\item removing the next sentence prediction objective,

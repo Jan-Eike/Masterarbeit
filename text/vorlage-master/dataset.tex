@@ -16,7 +16,7 @@ The dataset for validity classification is taken from the shared task on predict
 		\item[-] Label -1: Conclusion is invalid.
 	\end{enumerate}
 \end{enumerate}
-The data is already split in train, dev and test datasets, with a ratio of roughly $0.5$, $0.15$, $0.35$ and a total of $1472$ data points all in English language. The topics are mostly political, e.g. regarding Torture, 9/11 terror suspects or Turkey EU membership. A few topics are about social subjects, like Vegetarianism. A complete list of topics can be found in the appendix. All the conclusions are automatically generated and presented to human annotators \cite{argsvalidnovel2022}. The dev and test set do not share the same topics with the train set. In the training set, about $53\%$ of the data has the validity label 1 and in both dev and test set about $60\%$.
+The data is already split in train, dev and test datasets, with a ratio of roughly $0.5$, $0.15$, $0.35$ and a total of $1472$ data points all in English language. The topics are mostly political, e.g. regarding Torture, 9/11 terror suspects or Turkey EU membership. A few topics are about social subjects, like Vegetarianism. A complete list of topics can be found in the appendix. All the conclusions are automatically generated and presented to human annotators \cite{argsvalidnovel2022}. The dev and test set do not share the same topics with the train set. In the training set, about $53\%$ of the data has the validity label 1 and in both dev and test set about $60\%$. We also change the labeling from $-1$ for an invalid conclusion to $0$ for an invalid conclusion to match with the given examples in section \ref{sec:validity} and the labels for stance detection.
 
 \subsection{Stance Dataset}
 
@@ -27,13 +27,13 @@ The dataset for stance classification is taken from the the IBM project debater 
 	\item[\textbullet] Stance: Stance of the argument towards the topic.
 	\begin{enumerate}
 		\item[-] Label 1: Positive stance.
-		\item[-] Label -1: Negative stance.
+		\item[-] Label 0: Negative stance.
 	\end{enumerate}
 \end{enumerate}
 The data is split with a ratio of about $0.7$, $0.2$, $0.1$ in train, dev and test data with a total of $30,497$ data points all in English language. Both labels roughly have a $50\%$ probability of occurrence. The topics in this dataset vary across a wide variety of subjects and each topic has at most $6$ arguments \cite{stancedata} but most of the time just one. \\
 We decided to use another dataset besides the validity dataset since it only consists of $1472$ data points which is a comparably small number for deep learning tasks.
 
-\subsection{Data Augmentation}
+\subsection{Data Augmentation} \label{sec:chatgpt}
 
 Since not a lot of samples from both datasets include conclusions or arguments that start with linking words, we decided to pretrain our models on artificially created data that explicitly uses linking words. To generate this data, we used ChatGPT \cite{chatgpt} which is a chat bot that can create human like text given user input prompts. We are using prompts of the form
 \begin{center}
