@@ -16,3 +16,5 @@
 /y_train.txt
 /y_test.txt
 /test.txt
+/models
+/*.pt
