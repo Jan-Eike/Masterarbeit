@@ -230,15 +230,15 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
     set_seed(seed)
     # save location for each loop
     save = save + f"/{save_i}"
-    load = load + f"/{save_i}"
+    load = load + f"/0"
     Path(save).mkdir(parents=True, exist_ok=True)
 
     # define model, tokenizer and data collator
     model = AutoModelForMaskedLM.from_pretrained(model_attributes.model_checkpoint, output_hidden_states=True).to(DEVICE)
     tokenizer = AutoTokenizer.from_pretrained(model_attributes.model_checkpoint)
     def tokenize_function(examples):
-        #return tokenizer(examples["text"], padding="max_length", truncation=True)
-        return tokenizer(examples["text"], max_length=512, truncation=True, padding=True)
+        return tokenizer(examples["text"], padding="max_length", truncation=True)
+        #return tokenizer(examples["text"], max_length=512, truncation=True, padding=True)
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
 
     premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data = load_all_datasets()
@@ -263,6 +263,7 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
     tokenized_train_arg_quality = train_arg_quality.map(tokenize_function, batched=True)
     tokenized_test_arg_quality = test_arg_quality.map(tokenize_function, batched=True)
     tokenized_dev_arg_quality = dev_arg_quality.map(tokenize_function, batched=True)
+    #tokenized_complete = (tokenized_train_arg_quality, tokenized_dev_arg_quality, tokenized_test_arg_quality) # CHANGE
 
     # load already fine tuned model
     if load_prev or not train:
@@ -369,22 +370,22 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
             warmup_steps=100,
             load_best_model_at_end=True,
             evaluation_strategy=IntervalStrategy.STEPS,
-            eval_steps=30, # 150
+            eval_steps=30, # 200 30 # CHANGE same in classifier file
             save_total_limit=10,
-            save_steps=30 # 150
+            save_steps=30 # 200 30 # CHANGE same in classifier file
         )
         trainer = transformers.Trainer(
             model=model_class,
-            train_dataset=tokenized_train,
-            eval_dataset=tokenized_dev,
+            train_dataset=tokenized_train, # CHANGE
+            eval_dataset=tokenized_dev, # CHANGE
             compute_metrics=compute_metrics,
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
             args=training_args
         )
         trainer.train()
         trainer.model.eval()
-        baseline_scores = trainer.evaluate(eval_dataset=tokenized_test)
-        print("Baseline test f1: {}".format(baseline_scores["eval_f1"]))
+        baseline_scores = trainer.evaluate(eval_dataset=tokenized_test)["eval_f1"] # CHANGE
+        print("Baseline test f1: {}".format(baseline_scores))
         trainer.save_model(output_dir=save+"/LM_classification")
     else:
         #model_class = BertForSequenceClassification.from_pretrained(load + "/LM_classification", num_labels=2, output_hidden_states=True).to(DEVICE)
@@ -399,7 +400,7 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         data = json.load(file) 
 
     linking_word_list = f"list{linking_word_index}"
-    words = list(dict.fromkeys(x.lower() for x in data[linking_word_list]))
+    words = list(dict.fromkeys([x.lower() for x in data[linking_word_list]]))
 
     print(len(words))
     word_mapping = {word: i for i, word in enumerate(words)} # map words to numbers to sort them later
@@ -678,7 +679,7 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         "f1_bert_matrix_nn" : f1_bert_matrix_nn,
         "f1_bert_matrix_lgbm_best" : f1_bert_matrix_lgbm_best,
         "f1_bert_matrix_nn_best" : f1_bert_matrix_nn_best,
-        "baseline_scores" : baseline_scores["eval_f1"],
+        "baseline_scores" : baseline_scores,
         "f1_nn_complete" : f1_nn_complete,
         "f1_nn_best_complete" : f1_nn_best_complete,
         "f1_matrix_nn_complete" : f1_matrix_nn_complete,
@@ -694,8 +695,8 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
 
 
 if __name__ == "__main__":
-    model_attributes = ModelAttributes("bert-base-uncased")
-    seed = 42
+    model_attributes = ModelAttributes("roberta-base")
+    seed = 10
     linking_word_index = 1
 
     load = "./models/run_13_config_0110000110"
@@ -707,7 +708,7 @@ if __name__ == "__main__":
     all_bool_args = [True if config.get('BooleanArgs',i) == "True" else False for i in config['BooleanArgs']]
     
     save_suffix = "".join([str(int(i)) for i in all_bool_args])
-    save = "./models/run_18_config_" + save_suffix
+    save = "./models/run_24_config_" + save_suffix
     print(save)
 
     Path(save).mkdir(parents=True, exist_ok=True)
@@ -718,6 +719,7 @@ if __name__ == "__main__":
         scores.append(train_loop(i, model_attributes, load, save, seed, linking_word_index, all_bool_args))
 
     print(scores)
+    print()
     
     keys = scores[0].keys()
     values = np.array([list(dictx.values()) for dictx in scores])
