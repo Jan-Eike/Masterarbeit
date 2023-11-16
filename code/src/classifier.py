@@ -78,9 +78,9 @@ class Classifier():
             warmup_steps=100,
             load_best_model_at_end=True,
             evaluation_strategy=IntervalStrategy.STEPS,
-            eval_steps=30, # 150
+            eval_steps=250, # 250
             save_total_limit=10,
-            save_steps=30, # 150
+            save_steps=250, # 250
         )
         trainer = transformers.Trainer(
             model=model_class,
@@ -172,7 +172,7 @@ class Classifier():
                 _, predicted = torch.max(outputs, 1)
                 pred.extend(predicted.tolist())
 
-        f1_nn = f1_score(y_test, pred, average='macro')
+        f1_nn = f1_score(y_test, pred)
         print(f"f1: {f1_nn}")
         return f1_nn
 
@@ -188,6 +188,6 @@ class Classifier():
         )
         
         ypred = lgb_model.predict(x_test_df, num_iteration=lgb_model.best_iteration)
-        f1_lgbm = f1_score(y_test_df, (np.round(ypred)), average='macro')
+        f1_lgbm = f1_score(y_test_df, (np.round(ypred)))
         print(f"f1: {f1_lgbm}")
         return f1_lgbm

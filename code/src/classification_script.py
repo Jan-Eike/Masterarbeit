@@ -11,6 +11,7 @@ from model_attributes import ModelAttributes
 from tqdm import tqdm
 from sklearn.metrics import f1_score
 from sklearn.model_selection import RepeatedKFold
+from sklearn.dummy import DummyClassifier
 from concurrent.futures import ProcessPoolExecutor
 from classifier import Classifier
 from load_data import load_all_datasets
@@ -173,7 +174,7 @@ def feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params):
         
         lgb_preds += lgb_m.predict(x_dev_dft, num_iteration=lgb_m.best_iteration) / (nfolds*nrepeats)
 
-    print("CV score: {:<8.5f}".format(f1_score(np.round(fold_pred), y_train_dft, average="macro")))
+    print("CV score: {:<8.5f}".format(f1_score(np.round(fold_pred), y_train_dft)))
 
     all_features = feature_importance_df[["feature", "importance"]].groupby("feature").mean().sort_values(by="importance", ascending=False)
     all_features.reset_index(inplace=True)
@@ -273,6 +274,15 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         )
         trainer.save_model(output_dir=save)
 
+    dummy_clf = DummyClassifier(strategy="uniform")
+    dummy_clf.fit(test_arg_quality["text"], test_arg_quality["labels"])
+    p = dummy_clf.predict(test_arg_quality["text"])
+    s = f1_score(y_true=test_arg_quality["labels"], y_pred=p)
+    print("###################")
+    print(s)
+    print("###################")
+    print(dummy_clf.score(test_arg_quality["text"], test_arg_quality["labels"]))
+
     # training arguments for all masked LM     
     training_args = transformers.TrainingArguments(
         output_dir=save,
@@ -284,7 +294,7 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         warmup_steps=100,
         load_best_model_at_end=True,
         evaluation_strategy=IntervalStrategy.STEPS,
-        eval_steps=150,
+        eval_steps=30, # 250 30 CHANGE
         save_total_limit=10,
         metric_for_best_model="eval_loss",
         eval_accumulation_steps=10,
@@ -370,9 +380,9 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
             warmup_steps=100,
             load_best_model_at_end=True,
             evaluation_strategy=IntervalStrategy.STEPS,
-            eval_steps=30, # 200 30 # CHANGE same in classifier file
+            eval_steps=30, # 250 30 # CHANGE same in classifier file
             save_total_limit=10,
-            save_steps=30 # 200 30 # CHANGE same in classifier file
+            save_steps=30 # 250 30 # CHANGE same in classifier file
         )
         trainer = transformers.Trainer(
             model=model_class,
@@ -387,14 +397,9 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         baseline_scores = trainer.evaluate(eval_dataset=tokenized_test)["eval_f1"] # CHANGE
         print("Baseline test f1: {}".format(baseline_scores))
         trainer.save_model(output_dir=save+"/LM_classification")
-    else:
-        #model_class = BertForSequenceClassification.from_pretrained(load + "/LM_classification", num_labels=2, output_hidden_states=True).to(DEVICE)
-        pass
 
     model_class = model_class.to("cpu") if model_class is not None else model.to("cpu")
     model = model.to("cpu")
-
-    #words = ["t"herefore", "consequently", "hence", "thus", "so", "nevertheless", "however", "yet", "anyway", "although"]
     
     with open("./src/linking_words.json", "r") as file:
         data = json.load(file) 
@@ -695,8 +700,8 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
 
 
 if __name__ == "__main__":
-    model_attributes = ModelAttributes("roberta-base")
-    seed = 10
+    model_attributes = ModelAttributes("bert-base-uncased")
+    seed = 25
     linking_word_index = 1
 
     load = "./models/run_13_config_0110000110"
@@ -708,13 +713,13 @@ if __name__ == "__main__":
     all_bool_args = [True if config.get('BooleanArgs',i) == "True" else False for i in config['BooleanArgs']]
     
     save_suffix = "".join([str(int(i)) for i in all_bool_args])
-    save = "./models/run_24_config_" + save_suffix
+    save = "./models/run_46_config_" + save_suffix
     print(save)
 
     Path(save).mkdir(parents=True, exist_ok=True)
 
     scores = []
-    for i in range(3):
+    for i in range(1):
         seed += i
         scores.append(train_loop(i, model_attributes, load, save, seed, linking_word_index, all_bool_args))
 
