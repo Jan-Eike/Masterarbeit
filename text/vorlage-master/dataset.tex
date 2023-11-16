@@ -2,7 +2,7 @@
 
 We will primarily use two datasets. One for validity classification and one for stance classification. In this chapter will introduce both of them, describe our preprocessing and also mention additional data we are going to use besides these datasets.
 
-\subsection{Validity Dataset}
+\subsection{Validity Dataset} \label{sec:validitydata}
 
 The dataset for validity classification is taken from the shared task on predicting validity and novelty of arguments \cite{argsvalidnovel2022}. After discarding columns that are irrelevant for our work, each sample consists of the following columns:
 \begin{enumerate}
@@ -16,13 +16,30 @@ The dataset for validity classification is taken from the shared task on predict
 		\item[-] Label -1: Conclusion is invalid.
 	\end{enumerate}
 \end{enumerate}
-The data is already split in train, dev and test datasets, with a ratio of roughly $0.5$, $0.15$, $0.35$ and a total of $1472$ data points all in English language. The topics are mostly political, e.g. regarding Torture, 9/11 terror suspects or Turkey EU membership. A few topics are about social subjects, like Vegetarianism. A complete list of topics can be found in the appendix. All the conclusions are automatically generated and presented to human annotators \cite{argsvalidnovel2022}. The dev and test set do not share the same topics with the train set. In the training set, about $53\%$ of the data has the validity label 1 and in both dev and test set about $60\%$. We also change the labeling from $-1$ for an invalid conclusion to $0$ for an invalid conclusion to match with the given examples in section \ref{sec:validity} and the labels for stance detection.
+The data is already split in train, dev and test datasets, with a ratio of roughly $0.5$, $0.15$, $0.35$ and a total of $1472$ data points all in English language. The topics are mostly political, e.g. regarding Torture, 9/11 terror suspects or Turkey EU membership. A few topics are about social subjects, like Vegetarianism. A complete list of topics can be found in the appendix. All the conclusions are automatically generated and presented to human annotators \cite{argsvalidnovel2022}. The dev and test set do not share the same topics with the train set. In the training set, about $53\%$ of the data has the validity label 1 and in both dev and test set about $60\%$. We also change the labeling from $-1$ for an invalid conclusion to $0$ for an invalid conclusion to match with the given examples in section \ref{sec:validity} and the labels for stance detection. A sample data point is shown in Table \ref{fig:examplevaliditydata}.
 
-\subsection{Stance Dataset}
+\begin{table}[H]
+	\begin{center}
+	\footnotesize
+   	\begin{tabular}{|| c | c | c | c||}
+   	\hline
+   	Topic & Premise & Conclusion & Validity \\
+   	\hline\hline
+   	\makecell{Unilateral US military \\ strike inside Pakistan} & \makecell{We can do that using \\ the leverage of aid to \\ induce democracy.} & \makecell{Democracies can be \\ induced by aid} & $1$ \\
+   	\hline
+   	\makecell{Unilateral US military \\ strike inside Pakistan} & \makecell{Get bin Laden in Pakistan \\ unilaterally, if Pakistan can't} & \makecell{New Mexico Governor \\ Bill Richardson} & $0$ \\
+ 	\hline
+	\end{tabular}
+  \end{center}
+	\caption{Sample from the validity dataset.}%
+  	\label{fig:examplevaliditydata}
+\end{table}
+
+\subsection{Stance Dataset} \label{sec:stancedata}
 
 The dataset for stance classification is taken from the the IBM project debater datasets \cite{stancedata, ibm}. Again, we discard unused columns, resulting in the following columns:
 \begin{enumerate}
-	\item[\textbullet] Topic: A statement about an arbitrary topic.
+	\item[\textbullet] Statement: A statement about an arbitrary topic.
 	\item[\textbullet] Argument: Argument regarding the topic.
 	\item[\textbullet] Stance: Stance of the argument towards the topic.
 	\begin{enumerate}
@@ -30,20 +47,43 @@ The dataset for stance classification is taken from the the IBM project debater 
 		\item[-] Label 0: Negative stance.
 	\end{enumerate}
 \end{enumerate}
-The data is split with a ratio of about $0.7$, $0.2$, $0.1$ in train, dev and test data with a total of $30,497$ data points all in English language. Both labels roughly have a $50\%$ probability of occurrence. The topics in this dataset vary across a wide variety of subjects and each topic has at most $6$ arguments \cite{stancedata} but most of the time just one. \\
-We decided to use another dataset besides the validity dataset since it only consists of $1472$ data points which is a comparably small number for deep learning tasks.
+The data is split with a ratio of about $0.7$, $0.2$, $0.1$ in train, dev and test data with a total of $30,497$ data points all in English language. Both labels roughly have a $50\%$ probability of occurrence. The statements in this dataset vary across a wide variety of subjects and each statement has at most $6$ arguments \cite{stancedata} but most of the time just one. \\
+We decided to use another dataset besides the validity dataset since it only consists of $1472$ data points which is a comparably small number for deep learning tasks. A sample data point is shown in Table \ref{fig:examplestancedata}.
+
+\begin{table}[H]
+	\begin{center}
+	\footnotesize
+   	\begin{tabular}{|| c | c | c | c||}
+   	\hline
+   	Statement & Argument & Stance \\
+   	\hline\hline
+   	\makecell{We should end affirmative action} & \makecell{affirmative action is \\ reverse discrimination} & $1$ \\
+ 	\hline
+ 	\makecell{We should end affirmative action} & \makecell{affirmative action  hurts \\ other people more than it helps.} & $0$ \\
+ 	\hline
+	\end{tabular}
+  \end{center}
+	\caption{Sample from the stance dataset.}%
+  	\label{fig:examplestancedata}
+\end{table}
+
 
 \subsection{Data Augmentation} \label{sec:chatgpt}
 
 Since not a lot of samples from both datasets include conclusions or arguments that start with linking words, we decided to pretrain our models on artificially created data that explicitly uses linking words. To generate this data, we used ChatGPT \cite{chatgpt} which is a chat bot that can create human like text given user input prompts. We are using prompts of the form
-\begin{center}
+\begin{displayquote}
 	\textit{give me ten arguments consisting of multiple sentences and a conclusion that is indicated with <linking word>}.
-\end{center}
+\end{displayquote}
 
-Where we replace <linking word> with each of the linking words, we decided to use. We used the linking words "Thus", "Therefore", "So", "Hence" and "Consequently" to generate 40 data points each.
-\begin{center}
-	"Argument about the dangers of smoking: Smoking is a leading cause of preventable deaths, damaging nearly every organ in the body. Hence, it is essential to understand the health risks associated with smoking and to avoid it."
-\end{center}
+Where we replace <linking word> with each of the linking words, we decided to use. We used the linking words \say{Thus}, \say{Therefore}, \say{So}, \say{Hence} and \say{Consequently} to generate 40 data points each. An example for this data is shown in Figure \ref{fig:examplechatgptdata}.
+
+\begin{figure}[H]
+	\begin{displayquote}
+		Argument about the dangers of smoking: Smoking is a leading cause of preventable deaths, damaging nearly every organ in the body. Hence, it is essential to understand the health risks associated with smoking and to avoid it.
+	\end{displayquote}
+	\caption{Fully preprocessed data point.}%
+  	\label{fig:examplechatgptdata}
+\end{figure}
 
 \subsection{Preprocessing}
 
@@ -54,8 +94,23 @@ Besides the standard BERT preprocessing which consists of splitting strings in s
 	\item Add punctuation between the columns since LMs tend to change probabilities based on the position in the sentence (Is the [MASK] token after a comma or at the beginning of a new sentence?).
 \end{enumerate}
 
-After preprocessing, one data point looks like this:
-\begin{center}
-\raggedright
-"<\_t> TV viewing is harmful to children. <\_p> The popularity of TV watching is among the reasons of this phenomenon. Violence, aggression, crimes and wars are broadcast through the daily news as well as in movies, showing dark pictures that encourage psychological tension, pessimism and negative emotions. <\_c> Depression is a well-known psychological problem of modern society that is partly caused by TV watching."
-\end{center}
+A fully preprocessed data point is shown in Figure \ref{fig:exampleprep}.
+
+\begin{figure}[H]
+	\begin{displayquote}
+		<\_t> TV viewing is harmful to children. <\_p> The popularity of TV watching is among the reasons of this phenomenon. 		Violence, aggression, crimes and wars are broadcast through the daily news as well as in movies, showing dark 					pictures that encourage psychological tension, pessimism and negative emotions. <\_c> Depression is a well-known 				psychological problem of modern society that is partly caused by TV watching.
+	\end{displayquote}
+	\caption{Example for ChatGPT data. Generated 16-August-2023.}%
+  	\label{fig:exampleprep}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+

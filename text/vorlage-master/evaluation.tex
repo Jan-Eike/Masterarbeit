@@ -5,7 +5,7 @@ In this chapter, we will describe all the used model configurations and present 
 \subsection{Model Configurations and Results}
 
 The main structure of all different models is based on the model in Figure \ref{fig:model-architecture_full}. In this section, we will describe the exact configurations of all used models. \\
-Since using all possible model configurations we explained would result in more than $2^{10}$ configurations, we decided to not show the steps and results for models that severely under perform compared to other models. These steps include further pretraining with ChatGPT data (\ref{sec:chatgpt}) and using only the linking word embeddings without concatenating them with the LM embeddings. We also decided not to use both ways of generating LM embeddings (\ref{sec:bertembeddings}) since one way always slightly outperforms the other one. For the individual training, we only use the strategy of calculating the average over all token vectors along the first dimension and for the complete training, we only use the [CLS] token as embedding. We will also only use the maximum probability approach for calculating linking word probabilities for vailidity classification as described in the last part of section \ref{sec:linkingembeddings}.  \\
+Since using all possible model configurations we explained would result in more than $2^{10}$ configurations, we decided to not show the steps and results for models that severely under perform compared to other models. These steps include further pretraining with ChatGPT data (\ref{sec:chatgpt}) and using only the linking word embeddings without concatenating them with the LM embeddings. We also decided not to use both ways of generating LM embeddings (\ref{sec:bertembeddings}) since one way always slightly outperforms the other one. For the individual training, we only use the strategy of calculating the average over all token vectors along the first dimension ($E_{avg}$) and for the complete training, we only use the [CLS] token as embedding ($E_{[CLS]}$). We will also only use the maximum probability approach for calculating linking word probabilities ($P_{max}$) for vailidity classification as described in the last part of section \ref{sec:linkingembeddings}.  \\
 To describe each configuration, we are going to recap all the steps and give them a label.
 \begin{itemize}
 	\item Used LM $\in \{\text{BERT}, \text{RoBERTa}\}$.
@@ -16,7 +16,7 @@ To describe each configuration, we are going to recap all the steps and give the
 	\item Used embeddings $\in \{E, E_{Matrix}\}$. With $E_{Matrix}$ being the matrix embeddings and $E$ the normal linking words embeddings (\ref{sec:linkingembeddings}).
 	\item Feature Extraction $\in \{\textit{FE}^+, \textit{FE}^-\}$. With $\textit{FE}^+$ meaning with feature extraction and $\textit{FE}^-$ without.
 \end{itemize}
-With these labels in mind, we present the classification results in two tables, Table \ref{fig:validityresults} corresponding to the results for validity classification and Table \ref{fig:stanceresults} corresponding to the results for stance detection. Each model is trained and evaluated $3$ times and each value in the tables is the corresponding average f1-score. Models with the term "Complete" in the beginning of a row, use the complete training approach and hence $E_{[CLS]}$ for the LM embeddings, the other models use individual training and therefore $E_{avg}$. The models for validity classification will always use $P_{max}$ for the linking word probabilities calculation as described in the beginning of this section. For stance detection, we will always use $P$. \\
+With these labels in mind, we present the classification results in four tables, Table \ref{fig:validityresults} and \ref{fig:validityresults2} corresponding to the results for validity classification and Table \ref{fig:stanceresults} and \ref{fig:stanceresults2} corresponding to the results for stance detection. Each model is trained and evaluated $3$ times and each value in the tables is the corresponding average f1-score. Models with the term "Complete" in the beginning of a row, use the complete training approach and hence $E_{[CLS]}$ for the LM embeddings, the other models use individual training and therefore $E_{avg}$. The models for validity classification will always use $P_{max}$ for the linking word probabilities calculation as described in the beginning of this section. For stance detection, we will always use $P$. \\
 
 \begin{table}[h]
   	\tiny
@@ -24,42 +24,44 @@ With these labels in mind, we present the classification results in two tables, 
 	\begin{subtable}{.5\textwidth}
 		\centering
   		\renewcommand{\arraystretch}{1.4}
-   		\begin{tabular}{|| l || c | c ||}
+   		\begin{tabular}{|| l || c ||}
    			\hline
-   			{Configuration} & {BERT} & {RoBERTa} \\
+   			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.589 & x \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.589 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.580 & x \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.580 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.534 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.534 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.564 & x \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.564 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.557 & x \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.557 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.552 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.552 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.544 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.544 \\
  			\hline
- 			NN + LM only & 0.579 & 1 \\
+ 			NN + LM only & 0.579 \\
  			\hline
- 			LGBM + LM only & 0.547 & 1 \\
+ 			LGBM + LM only & 0.547 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & \textbf{0.754} & x \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.754 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & 0.752 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.752 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.746 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.746 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.745 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.745 \\
  			\hline
- 			Baseline & 0.767 & 1 \\
+ 			Baseline & 0.767 \\
+ 			\hline
+ 			Random Classifier & 0.500 \\
  			\hline
  			\hline
- 			Average & 0.624 & x \\
+ 			Average & 0.624 \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
@@ -68,48 +70,50 @@ With these labels in mind, we present the classification results in two tables, 
   	\begin{subtable}{.5\textwidth}
 		\centering
   		\renewcommand{\arraystretch}{1.4}
-   		\begin{tabular}{|| l || c | c ||}
+   		\begin{tabular}{|| l || c ||}
    			\hline
-   			{Configuration} & {BERT} & {RoBERTa} \\
+   			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.600 & x \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.600 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.588 & x \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.588 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.519 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.519 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ &  0.550 & x \\
+ 			LGBM + $E$ + $\textit{FE}^-$ &  0.550 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.511 & x \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.511 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.557 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.557 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.521 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.521 \\
  			\hline
- 			NN + LM only & 0.599 & 1 \\
+ 			NN + LM only & 0.599 \\
  			\hline
- 			LGBM + LM only & 0.532 & 1 \\
+ 			LGBM + LM only & 0.532 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & 0.765 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.765 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & 0.765 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.765 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.753 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.753 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.752 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.752 \\
  			\hline
- 			Baseline & 0.767 & 1\\
+ 			Baseline & 0.767 \\
+ 			\hline
+ 			Random Classifier & 0.500 \\
  			\hline
  			\hline
- 			Average & 0.622 & x \\
+ 			Average & 0.622 \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
   		\caption{Linking word list $L_2$.}%
   	\end{subtable}
-  	\caption{Evaluation results for validity classification with linking words lists $L_1$ and $L_2$.}%
+  	\caption{Evaluation results (f1-scores) for validity classification with linking words lists $L_1$ and $L_2$.}%
   	\label{fig:validityresults}
 \end{table}
 
@@ -119,42 +123,44 @@ With these labels in mind, we present the classification results in two tables, 
 	\begin{subtable}{.5\textwidth}
 		\centering
   		\renewcommand{\arraystretch}{1.4}
-   		\begin{tabular}{|| l || c | c ||}
+   		\begin{tabular}{|| l || c ||}
    			\hline
-   			{Configuration} & {BERT} & {RoBERTa} \\
+   			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.611 & x \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.611 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.588 & x \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.588 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.500 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.500 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.532 & x \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.532 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.547 & x \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.547 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.547 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.547 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.540 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.540 \\
  			\hline
- 			NN + LM only & 0.579 & 1 \\
+ 			NN + LM only & 0.579 \\
  			\hline
- 			LGBM + LM only & 0.547 & 1 \\
+ 			LGBM + LM only & 0.547 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & 0.769 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.769 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & 0.769 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.769 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.753 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.753 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.753 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.753 \\
  			\hline
- 			Baseline & 0.767 & 1\\
+ 			Baseline & 0.767 \\
+ 			\hline
+ 			Random Classifier & 0.500 \\
  			\hline
  			\hline
- 			Average & 0.623 & x \\
+ 			Average & 0.623 \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
@@ -163,52 +169,54 @@ With these labels in mind, we present the classification results in two tables, 
   	\begin{subtable}{.5\textwidth}
 		\centering
   		\renewcommand{\arraystretch}{1.4}
-   		\begin{tabular}{|| l || c | c ||}
+   		\begin{tabular}{|| l || c ||}
    			\hline
-   			{Configuration} & {BERT} & {RoBERTa} \\
+   			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.583 & x \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.583 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.593 & x \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.593 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.514 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.514 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.504 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.504 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.548 & x \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.548 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.521 & x \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.521 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.571 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.571 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.602 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.602 \\
  			\hline
- 			NN + LM only & 0.600 & 1 \\
+ 			NN + LM only & 0.600 \\
  			\hline
- 			LGBM + LM only & 0.532 & 1 \\
+ 			LGBM + LM only & 0.532 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & \textbf{0.752} & x \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.752 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & \textbf{0.752} & x \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.752 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.748 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.748 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.747 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.747 \\
  			\hline
- 			Baseline & 0.767 & 1\\
+ 			Baseline & 0.767 \\
+ 			\hline
+ 			Random Classifier & 0.500 \\
  			\hline
  			\hline
- 			Average & 0.622 & x \\
+ 			Average & 0.622 \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
   		\caption{Linking word list $L_4$.}%
   	\end{subtable}
-  	\caption{Evaluation results for validity classification with linking words lists $L_3$ and $L_4$.}%
+  	\caption{Evaluation results (f1-scores) for validity classification with linking words lists $L_3$ and $L_4$.}%
   	\label{fig:validityresults2}
 \end{table}
 
-When looking at the results for validity classification, we notice that for configurations that used the individual training approach, the model barely learns anything and would only outperform a random classifier by about $0.05$ in f1-score. Configurations that use the matrix embedding $E_{Matrix}$ tend to perform slightly worse than configurations that do not use them. Also feature selection does not increase the f1-score in most cases. Only the complete training approach can compete with the baseline. Both achieve f1-scores of about $0.75$ - $0.76$. The only configurations that outperform the baseline are 
+When looking at the results for validity classification, we notice that for configurations that used the individual training approach, the model barely learns anything and would only outperform a random classifier by about $0.05$ in f1-score. Configurations that use the matrix embedding $E_{Matrix}$ tend to perform slightly worse than configurations that do not use them. Also, feature selection does not increase the f1-score in most cases. Only the complete training approach can compete with the baseline. Both achieve f1-scores of about $0.75$ - $0.76$. The only configurations that outperform the baseline are 
 Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with an f1-score of $0.769$. The results are also pretty much equal along all sets of linking words.
 
 \begin{table}[h]
@@ -217,42 +225,42 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
 	\begin{subtable}{.5\textwidth}
 		\centering
   		\renewcommand{\arraystretch}{1.4}
-   		\begin{tabular}{|| l || c | c ||}
+   		\begin{tabular}{|| l || c ||}
    			\hline
-   			{Configuration} & {BERT} & {RoBERTa} \\
+   			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.896 & x \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.896 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.894 & x \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.894 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.815 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.815 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.827 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.827 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.893 & x \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.893 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.891 & x \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.891 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.894 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.894 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.894 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.894 \\
  			\hline
- 			NN + LM only & 0.895 & 1 \\
+ 			NN + LM only & 0.895 \\
  			\hline
- 			LGBM + LM only & 0.895 & 1 \\
+ 			LGBM + LM only & 0.895 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & 0.886 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.886 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & 0.881 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.881 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.433 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.433 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.580 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.580 \\
  			\hline
- 			Baseline & 0.908 & 1\\
+ 			Baseline & 0.908 \\
  			\hline
  			\hline
- 			Average & 0.836 & x \\
+ 			Average & 0.836 \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
@@ -261,48 +269,48 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
   	\begin{subtable}{.5\textwidth}
 		\centering
   		\renewcommand{\arraystretch}{1.4}
-   		\begin{tabular}{|| l || c | c ||}
+   		\begin{tabular}{|| l || c ||}
    			\hline
-   			{Configuration} & {BERT} & {RoBERTa} \\
+   			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.898 & x \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.898 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.897 & x \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.897 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.715 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.715 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.806 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.806 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.900 & x \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.900 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.898 & x \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.898 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.900 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.900 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.891 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.891 \\
  			\hline
- 			NN + LM only & 0.900 & 1 \\
+ 			NN + LM only & 0.900 \\
  			\hline
- 			LGBM + LM only & 0.897 & 1 \\
+ 			LGBM + LM only & 0.897 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & 0.851 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.851 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & 0.844 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.844 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.450 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.450 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.546 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.546 \\
  			\hline
- 			Baseline & 0.908 & 1\\
+ 			Baseline & 0.908 \\
  			\hline
  			\hline
- 			Average & 0.825 & x \\
+ 			Average & 0.825 \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
   		\caption{Linking word list $L_2$.}%
   	\end{subtable}
-  	\caption{Evaluation results for stance detection with linking words lists $L_1$ and $L_2$.}%
+  	\caption{Evaluation results (f1-scores) for stance detection with linking words lists $L_1$ and $L_2$.}%
   	\label{fig:stanceresults}
 \end{table}
 
@@ -312,42 +320,44 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
 	\begin{subtable}{.5\textwidth}
 		\centering
   		\renewcommand{\arraystretch}{1.4}
-   		\begin{tabular}{|| l || c | c ||}
+   		\begin{tabular}{|| l || c ||}
    			\hline
-   			{Configuration} & {BERT} & {RoBERTa} \\
+   			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.589 & x \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.589 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.580 & x \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.580 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.534 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.534 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.564 & x \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.564 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.557 & x \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.557 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.552 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.552 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.544 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.544 \\
  			\hline
- 			NN + LM only & 0.579 & 1 \\
+ 			NN + LM only & 0.579 \\
  			\hline
- 			LGBM + LM only & 0.547 & 1 \\
+ 			LGBM + LM only & 0.547 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & \textbf{0.754} & x \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.754 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & 0.752 & x \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.752 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.746 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.746 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.504 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.504 \\
  			\hline
- 			Baseline & 0.760 & 1\\
+ 			Baseline & 0.760 \\
+ 			\hline
+ 			Random Classifier & 0.500 \\
  			\hline
  			\hline
- 			Average & x & x \\
+ 			Average excluding random & x \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
@@ -356,48 +366,50 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
   	\begin{subtable}{.5\textwidth}
 		\centering
   		\renewcommand{\arraystretch}{1.4}
-   		\begin{tabular}{|| l || c | c ||}
+   		\begin{tabular}{|| l || c ||}
    			\hline
-   			{Configuration} & {BERT} & {RoBERTa} \\
+   			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.583 & x \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.583 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.593 & x \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.593 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.514 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.514 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.504 & x \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.504 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.548 & x \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.548 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.521 & x \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.521 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.571 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.571 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.602 & x \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.602 \\
  			\hline
- 			NN + LM only & 0.600 & 1 \\
+ 			NN + LM only & 0.600 \\
  			\hline
- 			LGBM + LM only & 0.532 & 1 \\
+ 			LGBM + LM only & 0.532 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & \textbf{0.752} & x \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.752 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & \textbf{0.752} & x \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.752 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.502 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.502 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.502 & x \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.502 \\
  			\hline
- 			Baseline & 0.760 & 1\\
+ 			Baseline & 0.760 \\
+ 			\hline
+ 			Random Classifier & 0.500 \\
  			\hline
  			\hline
- 			Average & x & x \\
+ 			Average & x \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
   		\caption{Linking word list $L_4$.}%
   	\end{subtable}
-  	\caption{Evaluation results for stance detection with linking words lists $L_3$ and $L_4$.}%
+  	\caption{Evaluation results (f1-scores) for stance detection with linking words lists $L_3$ and $L_4$.}%
   	\label{fig:stanceresults2}
 \end{table}
 
@@ -406,10 +418,7 @@ We can already see that the models achieve much higher f1-scores for stance dete
 \subsection{Discussion of the Results}
 \textbf{Validity Classification} \\
 When recalling the motivation of this thesis, we will primarily look at the models that used the complete training approach since for individual training, the results are just not good enough to make statement regarding the effect of linking words. But when it comes to model that were trained with the complete training approach, we can make comparisons between the effects of the four different sets of linking words. Unfortunately, the differences in the average f1-score for configurations with the complete training approach, is only about $0.016$ between $L_1$ which has the lowest and $L_3$ which has the highest f1-score. This difference alone does not really give us any insight to whether or not the actual meaning of the words in one of these lists matters. The f1-score also does not really differ from the baseline score hence it seems that also just adding embeddings for arbitrary words does not increase the performance of the LM. Even if we ignore the fact that each configurations was only trained and evaluated $3$ times and hence randomness is still quite a big factor, a difference of at most $0.016$ in f1-score is not significant enough to make any assumptions about these results. \\
-We can however discuss, what the reasons for the results might be. One possible reason is the aforementioned lack of a bigger dataset but we will see how a bigger dataset performs when we discuss the results for stance detection. The other possible reason will be discussed after discussing the results for stance detection. \\
+We can however discuss, what the reasons for the results might be. One possible reason is the lack of a bigger dataset but we will see how a bigger dataset performs when we discuss the results for stance detection. Another possible reason will be discussed after discussing the results for stance detection. \\
 
 \textbf{Stance detection} \\
-Since we can see a drastic improvement in f1-score for the models that were trained using the individual training approach, this indeed might have been a problem of not enough data for a good quality training. Unfortunately however, we can still not make any statements about our motivation in the beginning since the f1-scores for most other configurations are very close to each other, regardless of the used set of linking words. These results lead us to the main possible reason for the underwhelming results and for the lack of improvement using our approach for both classification tasks. The reason might be that the linking word embeddings were also calculated by using the same language model that the LM embeddings were extracted from (e.g. We concatenated BERT embeddings with linking word embeddings that were calculated using the same BERT model for masking). For that reason, the embeddings most likely do not contain any information that the LM embeddings do not already contain (no \textit{new} information is added to the LM embedding). So all in all the embedding just gets bigger but does not actually contain more information about the current data point. Another reason could also be that linking words are not really used that much in spoken language but rather in formal texts and therefore, language models might not give these words enough weighting to be relevant enough for our problems.
-
-
-https://7esl.com/linking-words/
+Since we can see a drastic improvement in f1-score for the models that were trained using the individual training approach, this indeed might have been a problem of not enough data for a good quality training. Unfortunately however, we can still not make any statements about our motivation in the beginning since the f1-scores for most other configurations are very close to each other, regardless of the used set of linking words. These results lead us to the main possible reason for the underwhelming results and for the lack of improvement using our approach for both classification tasks. The reason might be that the linking word embeddings were also calculated by using the same language model that the LM embeddings were extracted from (e.g. We concatenated BERT embeddings with linking word embeddings that were calculated using the same BERT model for masking). For that reason, the embeddings most likely do not contain any information that the LM embeddings do not already contain (no \textit{new} information is added to the LM embedding). So all in all the embedding just gets bigger but does not actually contain more information about the current data point.

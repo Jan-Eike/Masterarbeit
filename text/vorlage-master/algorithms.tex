@@ -2,11 +2,11 @@
 In this chapter, we will present all used algorithms and models for both classification tasks. The presented examples in this chapter are all using BERT for validity classification. All steps work analogously for RoBERTa and stance detection. The only difference is the input for the LMs since the data for stance detection looks a little bit different.
 
 \subsection{Baseline}
-To compare the performance of our models, we use simple BERT and RoBERTa classifier \cite{bert, roberta} as baseline. We use the training procedure and model from huggingface \cite{berttraining} with the standard parameters proposed in the original BERT paper \cite{bert}. More details can be found in the implementation chapter.
+To compare the performance of our models, we use simple BERT and RoBERTa classifier \cite{bert, roberta} as baseline. This is the same baseline, used in \cite{argsvalidnovel2022}. We use the training procedure and model from huggingface \cite{berttraining} with the standard parameters proposed in the original BERT paper \cite{bert}. We will also use a simple random classifier that predicts each label with a probability of $50\%$, as additional baseline. More details can be found in the implementation chapter.
 
 \subsection{Approach}
 
-This section is about describing all the necessary steps for our approach and explaining why we thought these steps are sensible. The approach consists of the following steps, as shown for BERT in figure \ref{fig:model-architecture1}:
+This section is about describing all the necessary steps for our approach and explaining why we thought these steps are sensible. The approach consists of the following steps, as shown for BERT in figure \ref{fig:model-architecture1} (all examples in this section are for validity classification only, they work analogously for stance detection, just with a different input data):
 
 \begin{enumerate}
 	\item Generate embeddings for each data point based on probabilities for linking words.
@@ -78,7 +78,7 @@ We also chose to apply another method to calculate the embedding for validity cl
 	\item For each datapoint, split the sentences of the premise.
 	\item Append "<\_c> [MASK] \textit{conclusion}" at each sentence.
 	\item Calculate probabilities for linking words at the [MASK] token position as before for each sentence conclusion pair.
-	\item Take the maximum probability for all linking words along all the sentences to generate a new embedding for this datapoint.
+	\item Take the maximum probability for all linking words along all the sentences to generate a new embedding for this premise conclusion pair.
 \end{enumerate}
 
 \subsubsection{BERT and RoBERTa embeddings} \label{sec:bertembeddings}
@@ -103,7 +103,7 @@ Before passing the embedding vectors to the classifier, we apply feature selecti
 \subsubsection{Summary}
 Combining all steps, gives us the model shown in figure \ref{fig:model-architecture_full}. We will evaluate all the introduced techniques in different configurations. All the exact configurations will be explained in the evaluation chapter.
 
-\begin{figure}[h]
+\begin{figure}[H]
   \centering
   \includegraphics[scale=0.6]{fig/model_complete.png}
   \caption{Complete Model Architecture for validity classification with BERT.}%

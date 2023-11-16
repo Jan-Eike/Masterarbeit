@@ -268,14 +268,6 @@
     \end{minipage}%
   }%
   \hfill%
-  \begin{minipage}[c]{6.8cm}
-    \begin{center}
-      \fontfamily{\sfdefault}\selectfont
-      {\large \textsc{Institut f\"ur Informatik \linebreak}}
-      {\small\centering Softwaretechnik und Programmiersprachen\linebreak}
-      {\scriptsize Universit\"atsstr. 1 \hspace{7mm} D--40225 D\"usseldorf}
-    \end{center}
-  \end{minipage}
 }
 
 \newcommand\@maketitle{%
@@ -525,11 +517,7 @@
   \cleardoublepage
 
   \makedeclaration % Declaration of Authorship
-  \cleardoublepage
 
-  \begin{abstract}
-    \input{abstract.tex}
-  \end{abstract}
   \cleardoublepage
 
   % Ensure cleverref knows how to talk about listings.

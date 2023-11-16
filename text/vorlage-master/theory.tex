@@ -7,44 +7,46 @@ We are going to evaluate our approaches on the two following tasks.
 
 \subsubsection{Validity Classification} \label{sec:validity}
 As described in \cite{argsvalidnovel2022}, a conclusion of a premise is considered valid if it follows naturally from its premise. In our case, a premise is a statement consisting of at least one sentence regarding a certain topic and a conclusion consists of exactly one sentence that sums up the premise.\\
-Following this definition, validity classification is a binary classification task in which we want to determine whether a conclusion is valid, given its premise. The label $1$ corresponds to a valid conclusion and the label $0$ to an invalid conclusion \cite{argsvalidnovel2022}. An example is shown in figure \ref{fig:val_class1}.
+Following this definition, validity classification is a binary classification task in which we want to determine whether a conclusion is valid, given its premise. The label $1$ corresponds to a valid conclusion and the label $0$ to an invalid conclusion \cite{argsvalidnovel2022}. An example is shown in Table \ref{fig:val_class1}.
 
-\begin{figure}[H]
+\begin{table}[H]
   \begin{center}
    	\begin{tabular}{|| c | c | c||}
    	\hline
-   	Premise & Conclusion & Validity \\ [0.5ex]
+   	Premise & Conclusion & Validity \\
    	\hline\hline
    	\multirow{2}{*}{\makecell{A November 2009 CBS News Poll found \\ that only 40 percent of Americans \\ want Mohammed and his four minions \\ to be tried in federal criminal court.}} & Wind energy is free. & 0 \\\cline{2-3}
  	& \makecell{Majority of Americans \\ are opposed to civilian \\ trial of terrorists.} & 1 \\
  	\hline
 	\end{tabular}
   \end{center}
-  \caption{Example for validity classification.}%
+  \caption{Example for validity classification, taken from the validity dataset (see Section \ref{sec:validitydata}).}%
   \label{fig:val_class1}
-\end{figure}
+\end{table}
 
-Since we are only interested in the validity of the conclusion, comparisons to the Validity and Novelty Prediction Shared Task \cite{argsvalidnovel2022}, from which we adapted the task, are less meaningful because they classify validity and another label called novelty at the same time. Hence we will adapt their baseline for our task and use this to compare our models.
+Since this dataset and the task of validity classification is taken from \cite{argsvalidnovel2022}, it is also interesting to look at approaches presented in this paper. The most successful approaches used either GPT-3 \cite{gpt3} alone, or a combination of GPT-3 and RoBERTa \cite{roberta} to solve the task. Others used different language models either alone, or in combination with different methods like SVMs or ConceptNet \cite{conceptnet}. These models were compared against a simple baseline. We will use the same baseline which we will explain later, for our own evaluations.
 
 
 \subsubsection{Stance Detection}
 
-Our second main tasks is called stance detection. It is a classification task in which we want to decide whether an argument which consists of at least one sentence, is for (positive stance) or against (negative stance) a certain statement which consists of one sentence about some topic \cite{mohammad2017stance}. A positive stance towards the statement corresponds to the label $1$ and a negative stance corresponds to the label $0$. Stance detection can be extended to have a third label which corresponds to a neutral opinion towards the statement but we will stick with the binary version in this thesis. An example for stance detection is shown in figure \ref{fig:stance_class1}.
+Our second main tasks is called stance detection. It is a classification task in which we want to decide whether an argument which consists of at least one sentence, is for (positive stance) or against (negative stance) a certain statement which consists of one sentence about some topic \cite{mohammad2017stance}. A positive stance towards the statement corresponds to the label $1$ and a negative stance corresponds to the label $0$. Stance detection can be extended to have a third label which corresponds to a neutral opinion towards the statement but we will stick with the binary version in this thesis. An example for stance detection is shown in Table \ref{fig:stance_class1}.
 
-\begin{figure}[H]
+\begin{table}[H]
   \begin{center}
    	\begin{tabular}{|| c | c | c||}
    	\hline
-   	Statement & Argument & Stance \\ [0.5ex]
+   	Statement & Argument & Stance \\
    	\hline\hline
    	\multirow{2}{*}{\makecell{ We should limit \\ executive \\ compensation.}} & \makecell{A company can pay higher to their \\ employees if executive compensation is limited.} & 1 \\\cline{2-3}
  	& \makecell{A company has the right to determine how \\ much executive compensation they can pay out.} & 0 \\
  	\hline
 	\end{tabular}
   \end{center}
-  \caption{Example for stance detection.}%
+  \caption{Example for stance detection, taken from the stance dataset (see Section \ref{sec:stancedata}).}%
   \label{fig:stance_class1}
-\end{figure}
+\end{table}
+
+Unfortunately, the paper providing the data for stance detection \cite{ibm} evaluates the data on a different task than we do. Therefore we cannot compare our results on this specific dataset. But looking at other approaches, the most successful ones use graph neural networks, like Relational Graph Transformers (RGT) \cite{rgt} or Simple Heterogeneous Graph Neural Network (S-HGN) \cite{shgn}
 
 \subsection{Linking words}
 As described in the beginning, we will use the probabilities of linking words to be at a certain position in a text to create additional features for our classifiers. We will use different lists of linking words as well as a list of words which are not necessarily considered linking words. The main list of linking words is the following:
@@ -57,7 +59,7 @@ The chosen list is composed of words that indicate a conclusion, like "therefore
 \begin{center}
 	$L_2$ = [the, be, to, of, and, a, in, that, have, I, it, for, not, on, with, he, as, you, do]
 \end{center}
-Comparing the results for both lists can give us more insight about whether or not the words in these lists actually play a role or not. We also added a list with $100$ linking words and one list with the $100$ most common English words to further compare the influence of these words. Both of these lists can be found in the appendix.
+Comparing the results for both lists can give us more insight about whether or not the words in these lists actually play a role or not. We also added a list with $90$ linking words and one list with the $90$ most common English words to further compare the influence of these words. Both of these lists can be found in the appendix.
 
 \subsection{Language Models}
 As hinted in the introduction, we will use language models to assign probabilities to linking words at certain positions in a text. A language model (LM) is a model that assigns probabilities to sequences of words \cite{languagemodels2023}. There are various types of LMs, achieving better performances in different areas. Especially since the release of ChatGPT \cite{chatgpt}, autoregressive models like GPT-3 have become very popular. These models assign probabilities to words, based on the context before the word and therefore generate one word after another based on these probabilities to generate text \cite{gpt3}. Other models, like BERT \cite{bert}, use a bidirectional approach which we will explain in detail in the next part. These bidirectional models are able to predict a masked word from a sentence, based on its left and right context. The model will then return a set of words and their corresponding probabilities to fill this [MASK] token \cite{bert}, as shown in figure \ref{fig:bert_masking_example}.
@@ -68,7 +70,7 @@ As hinted in the introduction, we will use language models to assign probabiliti
   \end{center}
   \centering
   \includegraphics[scale=0.9]{fig/bert_masking_example.png}
-  \caption{Example for masking of language models \cite{bertbaseuncased}, accessed 20-October-2023. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
+  \caption{Example for masking of language models (in this case bert-base-uncased) \cite{bertbaseuncased}, accessed 20-October-2023. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
   \label{fig:bert_masking_example}
 \end{figure}
 
@@ -80,7 +82,7 @@ We will present another example (see figure \ref{fig:bert_masking_example2}), sh
   \end{center}
   \centering
   \includegraphics[scale=0.9]{fig/bert_masking_example2.png}
-  \caption{Example for linking word masking of language models \cite{bertbaseuncased}, accessed 20-October-2023. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
+  \caption{Example for linking word masking of language models (in this case bert-base-uncased) \cite{bertbaseuncased}, accessed 20-October-2023. The figure shows the 5 most likely words and their corresponding probabilities for the [MASK] token in the sentence above.}%
   \label{fig:bert_masking_example2}
 \end{figure}
 
