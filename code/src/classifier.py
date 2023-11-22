@@ -14,6 +14,7 @@ from utils import (
     compute_metrics,
     lgb_f1_score
 )
+DEVICE = "cuda" 
 
 class Classifier():
     def __init__(self, class_type: str) -> None:
@@ -67,7 +68,7 @@ class Classifier():
         tokenized_test = datasets.concatenate_datasets([tokenized_test, dataset_custom_embeddings_test], axis=1)
         # save instead of model_attributes.model_checkpoint
         set_seed(seed)
-        model_class = NNClassifierWithBert(model_attributes.model_checkpoint, 2, input_length).to("cuda")
+        model_class = NNClassifierWithBert(model_attributes.model_checkpoint, 2, input_length).to(DEVICE)
         training_args = transformers.TrainingArguments(
             output_dir=save,
             overwrite_output_dir=False,

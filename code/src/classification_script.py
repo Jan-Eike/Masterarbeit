@@ -11,7 +11,6 @@ from model_attributes import ModelAttributes
 from tqdm import tqdm
 from sklearn.metrics import f1_score
 from sklearn.model_selection import RepeatedKFold
-from sklearn.dummy import DummyClassifier
 from concurrent.futures import ProcessPoolExecutor
 from classifier import Classifier
 from load_data import load_all_datasets
@@ -149,6 +148,7 @@ def calculate_embedding_vector_stance_parallel(args):
     return probs_each
 
 
+# adapted from https://www.kaggle.com/code/ashishpatel26/feature-importance-of-lightgbm
 def feature_extraction(x_train_dft, x_test_dft, x_dev_dft, y_train_dft, params):
     nfolds = 5
     nrepeats = 2 
@@ -264,7 +264,7 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
     tokenized_train_arg_quality = train_arg_quality.map(tokenize_function, batched=True)
     tokenized_test_arg_quality = test_arg_quality.map(tokenize_function, batched=True)
     tokenized_dev_arg_quality = dev_arg_quality.map(tokenize_function, batched=True)
-    #tokenized_complete = (tokenized_train_arg_quality, tokenized_dev_arg_quality, tokenized_test_arg_quality) # CHANGE
+    tokenized_complete = (tokenized_train_arg_quality, tokenized_dev_arg_quality, tokenized_test_arg_quality) # CHANGE
 
     # load already fine tuned model
     if load_prev or not train:
@@ -273,15 +273,6 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
             model=model,
         )
         trainer.save_model(output_dir=save)
-
-    dummy_clf = DummyClassifier(strategy="uniform")
-    dummy_clf.fit(test_arg_quality["text"], test_arg_quality["labels"])
-    p = dummy_clf.predict(test_arg_quality["text"])
-    s = f1_score(y_true=test_arg_quality["labels"], y_pred=p)
-    print("###################")
-    print(s)
-    print("###################")
-    print(dummy_clf.score(test_arg_quality["text"], test_arg_quality["labels"]))
 
     # training arguments for all masked LM     
     training_args = transformers.TrainingArguments(
@@ -294,7 +285,7 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         warmup_steps=100,
         load_best_model_at_end=True,
         evaluation_strategy=IntervalStrategy.STEPS,
-        eval_steps=30, # 250 30 CHANGE
+        eval_steps=250, # 250 30 CHANGE
         save_total_limit=10,
         metric_for_best_model="eval_loss",
         eval_accumulation_steps=10,
@@ -380,21 +371,21 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
             warmup_steps=100,
             load_best_model_at_end=True,
             evaluation_strategy=IntervalStrategy.STEPS,
-            eval_steps=30, # 250 30 # CHANGE same in classifier file
+            eval_steps=250, # 250 30 # CHANGE same in classifier file
             save_total_limit=10,
-            save_steps=30 # 250 30 # CHANGE same in classifier file
+            save_steps=250 # 250 30 # CHANGE same in classifier file
         )
         trainer = transformers.Trainer(
             model=model_class,
-            train_dataset=tokenized_train, # CHANGE
-            eval_dataset=tokenized_dev, # CHANGE
+            train_dataset=tokenized_train_arg_quality, # CHANGE
+            eval_dataset=tokenized_dev_arg_quality, # CHANGE
             compute_metrics=compute_metrics,
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
             args=training_args
         )
         trainer.train()
         trainer.model.eval()
-        baseline_scores = trainer.evaluate(eval_dataset=tokenized_test)["eval_f1"] # CHANGE
+        baseline_scores = trainer.evaluate(eval_dataset=tokenized_test_arg_quality)["eval_f1"] # CHANGE
         print("Baseline test f1: {}".format(baseline_scores))
         trainer.save_model(output_dir=save+"/LM_classification")
 
@@ -415,9 +406,9 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         bert_embeddings_test = np.load(load + '/bert_embeddings_test.npy', allow_pickle=True)
         bert_embeddings_dev = np.load(load + '/bert_embeddings_dev.npy', allow_pickle=True)
     elif calc_bert_embeddings:
-        bert_embeddings_train = extract_bert_embeddings(premise_conclusion_train, tokenizer, model_class) #CHANGE
-        bert_embeddings_test = extract_bert_embeddings(premise_conclusion_test, tokenizer, model_class) #CHANGE
-        bert_embeddings_dev = extract_bert_embeddings(premise_conclusion_dev, tokenizer, model_class) #CHANGE
+        bert_embeddings_train = extract_bert_embeddings(train_arg_quality, tokenizer, model_class) #CHANGE
+        bert_embeddings_test = extract_bert_embeddings(test_arg_quality, tokenizer, model_class) #CHANGE
+        bert_embeddings_dev = extract_bert_embeddings(dev_arg_quality, tokenizer, model_class) #CHANGE
     np.save(save + '/bert_embeddings_train.npy', bert_embeddings_train, allow_pickle=True)
     np.save(save + '/bert_embeddings_test.npy', bert_embeddings_test, allow_pickle=True)
     np.save(save + '/bert_embeddings_dev.npy', bert_embeddings_dev, allow_pickle=True)
