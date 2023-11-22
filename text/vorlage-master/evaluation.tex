@@ -4,19 +4,22 @@ In this chapter, we will describe all the used model configurations and present 
 
 \subsection{Model Configurations and Results}
 
-The main structure of all different models is based on the model in Figure \ref{fig:model-architecture_full}. In this section, we will describe the exact configurations of all used models. \\
-Since using all possible model configurations we explained would result in more than $2^{10}$ configurations, we decided to not show the steps and results for models that severely under perform compared to other models. These steps include further pretraining with ChatGPT data (\ref{sec:chatgpt}) and using only the linking word embeddings without concatenating them with the LM embeddings. We also decided not to use both ways of generating LM embeddings (\ref{sec:bertembeddings}) since one way always slightly outperforms the other one. For the individual training, we only use the strategy of calculating the average over all token vectors along the first dimension ($E_{avg}$) and for the complete training, we only use the [CLS] token as embedding ($E_{[CLS]}$). We will also only use the maximum probability approach for calculating linking word probabilities ($P_{max}$) for vailidity classification as described in the last part of section \ref{sec:linkingembeddings}.  \\
+The main structure of all the different models is based on the model in Figure \ref{fig:model-architecture_full}. In this section, we will describe the exact configurations of all used models. \\
+Since using all possible model configurations we explained would result in more than $2^{10}$ configurations, we decided to not show the steps and results for models that severely under perform compared to other models. These steps include further pretraining with ChatGPT data (\ref{sec:chatgpt}) and using only the linking word embeddings without concatenating them with the LM embeddings. We also decided not to use both ways of generating LM embeddings (\ref{sec:bertembeddings}) since one way always slightly outperforms the other one. For the individual training, we only use the strategy of calculating the average over all token vectors along the first dimension ($E_{avg}$). For the complete training, we only use the [CLS] token as embedding ($E_{[CLS]}$). We will also only use the maximum probability approach for calculating linking word probabilities ($P_{max}$) for vailidity classification, as described in the last part of section \ref{sec:linkingembeddings}.
+We also decided not to show the results achieved with RoBERTa since they were essentially the same as for BERT. We decided to stick with BERT, as RoBERTa's vocabulary lacked some words that were part of our linking word list. Therefore, we had to remove some of the words before calculating the linking words embeddings with RoBERTa. Some other discarded ideas can be found in the appendix. \\
 To describe each configuration, we are going to recap all the steps and give them a label.
 \begin{itemize}
-	\item Used LM $\in \{\text{BERT}, \text{RoBERTa}\}$.
-	\item Used LM embedding $\in \{E_{[CLS]}, E_{avg}\}$.
-	\item Used approach to calculate linking word probabilities $\in \{P_{max}, P\}$.
-	\item Used classifier $\in \{\text{Neural Network Classifier (NN)}, \text{LightGBM Classifier (LGBM)}\}$.
-	\item Used set of linking words $\in \{L_1, L_2, L_3, L_4\}$. The entire linking word sets can be found in the appendix.
-	\item Used embeddings $\in \{E, E_{Matrix}\}$. With $E_{Matrix}$ being the matrix embeddings and $E$ the normal linking words embeddings (\ref{sec:linkingembeddings}).
-	\item Feature Extraction $\in \{\textit{FE}^+, \textit{FE}^-\}$. With $\textit{FE}^+$ meaning with feature extraction and $\textit{FE}^-$ without.
+	\item LM $\in \{\text{BERT}, \text{RoBERTa}\}$.
+	\item LM embedding $\in \{E_{[CLS]}, E_{avg}\}$.
+	\item Approach to calculate linking word probabilities $\in \{P_{max}, P\}$.
+	\item Classifier $\in \{\text{Neural Network Classifier (NN)}, \text{LightGBM Classifier (LGBM)}\}$.
+	\item Set of linking words $\in \{L_1, L_2, L_3, L_4\}$. The entire linking word sets can be found in the appendix.
+	\item Embeddings $\in \{E, E_{Matrix}\}$, with $E_{Matrix}$ being the matrix embeddings and $E$ the normal linking words embeddings (\ref{sec:linkingembeddings}).
+	\item Feature Extraction $\in \{\textit{FE}^+, \textit{FE}^-\}$, with $\textit{FE}^+$ meaning \say{with feature extraction} and $\textit{FE}^-$ without.
 \end{itemize}
-With these labels in mind, we present the classification results in four tables, Table \ref{fig:validityresults} and \ref{fig:validityresults2} corresponding to the results for validity classification and Table \ref{fig:stanceresults} and \ref{fig:stanceresults2} corresponding to the results for stance detection. Each model is trained and evaluated $3$ times and each value in the tables is the corresponding average f1-score. Models with the term "Complete" in the beginning of a row, use the complete training approach and hence $E_{[CLS]}$ for the LM embeddings, the other models use individual training and therefore $E_{avg}$. The models for validity classification will always use $P_{max}$ for the linking word probabilities calculation as described in the beginning of this section. For stance detection, we will always use $P$. \\
+With these labels in mind we present the classification results in four tables: Table \ref{fig:validityresults} and \ref{fig:validityresults2} corresponding to the results for validity classification, and Table \ref{fig:stanceresults} and \ref{fig:stanceresults2} corresponding to the results for stance detection. Each model is trained and evaluated three times and each value in the tables is the corresponding average f1-score. Models with the term \say{Complete} in the beginning of a row use the complete training approach and hence $E_{[CLS]}$ for the LM embeddings; the other models use individual training and therefore $E_{avg}$. The models for validity classification will always use $P_{max}$ for the linking word probabilities calculation, as described in the beginning of this section. For stance detection, we will always use $P$. \\
+
+Before we start looking at the results, we have to note that comparing our results against the results presented in the journal paper \cite{argsvalidnovel2022} is not really possible since we use a different version of the f1-score. Therefore, we will only compare our results among each other.
 
 \begin{table}[h]
   	\tiny
@@ -216,8 +219,9 @@ With these labels in mind, we present the classification results in four tables,
   	\label{fig:validityresults2}
 \end{table}
 
-When looking at the results for validity classification, we notice that for configurations that used the individual training approach, the model barely learns anything and would only outperform a random classifier by about $0.05$ in f1-score. Configurations that use the matrix embedding $E_{Matrix}$ tend to perform slightly worse than configurations that do not use them. Also, feature selection does not increase the f1-score in most cases. Only the complete training approach can compete with the baseline. Both achieve f1-scores of about $0.75$ - $0.76$. The only configurations that outperform the baseline are 
-Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with an f1-score of $0.769$. The results are also pretty much equal along all sets of linking words.
+When looking at the results for validity classification, we notice that for configurations that used the individual training approach the model barely learns anything and would only outperform a random classifier by about $0.05$ in f1-score. Configurations that use the matrix embedding $E_{Matrix}$ tend to perform slightly worse than configurations that do not use them. Also, feature selection does not increase the f1-score in most cases. Only the complete training approach can compete with the baseline. Both achieve f1-scores of about $0.75$ - $0.76$. The only configurations that outperform the baseline are 
+Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with an f1-score of $0.769$. The results are also essentially equal along all sets of linking words. There are some exceptions though: For the longer two lists $L_3$ and $L_4$ the feature extraction performs a little bit better than for the other two lists. \\
+We also want to point out that f1-scores on the dev set during training and fine tuning are usually higher by about $0.02$ which shows that we do not overfit on the development set, which could have been a reason for the worse performance of most of the models.
 
 \begin{table}[h]
   	\tiny
@@ -258,6 +262,8 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
  			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.580 \\
  			\hline
  			Baseline & 0.908 \\
+ 			\hline
+ 			Random Classifier & 0.5 \\
  			\hline
  			\hline
  			Average & 0.836 \\
@@ -303,6 +309,8 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
  			\hline
  			Baseline & 0.908 \\
  			\hline
+ 			Random Classifier & 0.5 \\
+ 			\hline
  			\hline
  			Average & 0.825 \\
  			\hline
@@ -324,40 +332,40 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
    			\hline
    			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.589 \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.898 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.580 \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.897 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.534 \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.582 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.549 \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.508 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.564 \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.900 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.557 \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.899 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.552 \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.894 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.544 \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.894 \\
  			\hline
- 			NN + LM only & 0.579 \\
+ 			NN + LM only & 0.900 \\
  			\hline
- 			LGBM + LM only & 0.547 \\
+ 			LGBM + LM only & 0.897 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & 0.754 \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.848 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & 0.752 \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.857 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.746 \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.638 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.504 \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.669 \\
  			\hline
- 			Baseline & 0.760 \\
+ 			Baseline & 0.908 \\
  			\hline
- 			Random Classifier & 0.500 \\
+ 			Random Classifier & 0.5 \\
  			\hline
  			\hline
- 			Average excluding random & x \\
+ 			Average excluding random & 0.813 \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
@@ -370,40 +378,40 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
    			\hline
    			{Configuration} & {f1-score} \\
    			\hline\hline
-   			NN + $E$ + $\textit{FE}^-$ &  0.583 \\
+   			NN + $E$ + $\textit{FE}^-$ &  0.899 \\
  			\hline
- 			NN + $E$ + $\textit{FE}^+$ & 0.593 \\
+ 			NN + $E$ + $\textit{FE}^+$ & 0.897 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.514 \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.580 \\
  			\hline
- 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.504 \\
+ 			NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.592 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^-$ & 0.548 \\
+ 			LGBM + $E$ + $\textit{FE}^-$ & 0.894 \\
  			\hline
- 			LGBM + $E$ + $\textit{FE}^+$ & 0.521 \\
+ 			LGBM + $E$ + $\textit{FE}^+$ & 0.899 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.571 \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^-$ & 0.898 \\
  			\hline
- 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.602 \\
+ 			LGBM + $E_{Matrix}$ + $\textit{FE}^+$ & 0.895 \\
  			\hline
- 			NN + LM only & 0.600 \\
+ 			NN + LM only & 0.898 \\
  			\hline
- 			LGBM + LM only & 0.532 \\
+ 			LGBM + LM only & 0.895 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^-$ & 0.752 \\
+ 			Complete NN + $E$ + $\textit{FE}^-$ & 0.872 \\
  			\hline
- 			Complete NN + $E$ + $\textit{FE}^+$ & 0.752 \\
+ 			Complete NN + $E$ + $\textit{FE}^+$ & 0.856 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.502 \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ & 0.602 \\
  			\hline
- 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.502 \\
+ 			Complete NN + $E_{Matrix}$ + $\textit{FE}^+$ & 0.555 \\
  			\hline
- 			Baseline & 0.760 \\
+ 			Baseline & 0.908 \\
  			\hline
- 			Random Classifier & 0.500 \\
+ 			Random Classifier & 0.5 \\
  			\hline
  			\hline
- 			Average & x \\
+ 			Average excluding random & 0.809 \\
  			\hline
 		\end{tabular}
 		\renewcommand{\arraystretch}{1}
@@ -413,12 +421,12 @@ Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with
   	\label{fig:stanceresults2}
 \end{table}
 
-We can already see that the models achieve much higher f1-scores for stance detection, even when trained with the individual training approach. Except for the configurations Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ and Complete NN + $E_{Matrix}$ + $\textit{FE}^+$, most models achieved an f1-score of more than $0.8$ and a lot of them even more than $0.89$. This however is still worse than the baseline by about $0.008$ for the best performing configuration. We also still cannot see a noticeable difference between the sets of linking words, neither in the meaning of the words nor in the number of used words. Another difference we can observe it that using $E_{Matrix}$ decreases the performance of configurations that use a neural network classifier but for the LightGBM classifier it does not seem to make a difference.
+We can already see that the models achieve much higher f1-scores for stance detection, even when trained with the individual training approach. Except for the configurations Complete NN + $E_{Matrix}$ + $\textit{FE}^-$ and Complete NN + $E_{Matrix}$ + $\textit{FE}^+$, most models achieved an f1-score of more than $0.8$; a lot of them even more than $0.89$. This however is still worse than the baseline by about $0.008$ for the best performing configuration. We also still cannot see a noticeable difference between the sets of linking words, neither in the meaning of the words, nor in the number of used words. Another difference we can observe is that using $E_{Matrix}$ decreases the performance of configurations that use a neural network classifier, but for the LightGBM classifier it does not seem to make a difference. This time, the linking word lists actually do make a difference when we compare the larger with the smaller ones. The larger ones perform worse on average; especially bad when using matrix embeddings without LGBM. \\
 
 \subsection{Discussion of the Results}
-\textbf{Validity Classification} \\
-When recalling the motivation of this thesis, we will primarily look at the models that used the complete training approach since for individual training, the results are just not good enough to make statement regarding the effect of linking words. But when it comes to model that were trained with the complete training approach, we can make comparisons between the effects of the four different sets of linking words. Unfortunately, the differences in the average f1-score for configurations with the complete training approach, is only about $0.016$ between $L_1$ which has the lowest and $L_3$ which has the highest f1-score. This difference alone does not really give us any insight to whether or not the actual meaning of the words in one of these lists matters. The f1-score also does not really differ from the baseline score hence it seems that also just adding embeddings for arbitrary words does not increase the performance of the LM. Even if we ignore the fact that each configurations was only trained and evaluated $3$ times and hence randomness is still quite a big factor, a difference of at most $0.016$ in f1-score is not significant enough to make any assumptions about these results. \\
-We can however discuss, what the reasons for the results might be. One possible reason is the lack of a bigger dataset but we will see how a bigger dataset performs when we discuss the results for stance detection. Another possible reason will be discussed after discussing the results for stance detection. \\
+\textbf{Validity Classification} \\\\
+When recalling the motivation for this thesis we will primarily look at the models that used the complete training approach, since for individual training, the results are just not good enough to make a statement regarding the effect of linking words. But when it comes to models that were trained with the complete training approach, we can make comparisons between the effects of the four different sets of linking words. Unfortunately, the differences in the average f1-score for configurations with the complete training approach are only about $0.016$ between $L_1$, which has the lowest and $L_3$, which has the highest f1-score. This difference alone does not give us any meaningful insight to whether or not the actual meaning of the words in one of these lists matters. The f1-score also does not differ significantly from the baseline score. Hence it seems that also just adding embeddings for arbitrary words does not increase the performance of the LM. Especially when we consider that the standard deviation after three runs is, for most results, about $0.01$, a difference of at most $0.016$ in f1-score is not significant enough to make any assumptions about these results. \\
+We can, however, discuss what the reasons for the results might be. One possible reason is the lack of a bigger dataset, but we will see how a bigger dataset performs when we discuss the results for stance detection. Another possible reason will be discussed afterwards. \\
 
-\textbf{Stance detection} \\
-Since we can see a drastic improvement in f1-score for the models that were trained using the individual training approach, this indeed might have been a problem of not enough data for a good quality training. Unfortunately however, we can still not make any statements about our motivation in the beginning since the f1-scores for most other configurations are very close to each other, regardless of the used set of linking words. These results lead us to the main possible reason for the underwhelming results and for the lack of improvement using our approach for both classification tasks. The reason might be that the linking word embeddings were also calculated by using the same language model that the LM embeddings were extracted from (e.g. We concatenated BERT embeddings with linking word embeddings that were calculated using the same BERT model for masking). For that reason, the embeddings most likely do not contain any information that the LM embeddings do not already contain (no \textit{new} information is added to the LM embedding). So all in all the embedding just gets bigger but does not actually contain more information about the current data point.
+\textbf{Stance detection} \\\\
+Since we can see a drastic improvement in f1-score for the models that were trained using the individual training approach, this indeed might have been a problem of an insufficient amount of data for a good quality training. Unfortunately, we can still not make any statements about our motivation from the beginning since the f1-scores for most other configurations are very close to each other, regardless of whether or not we used \say{real} linking words or just the most common words. Only the length of the linking word list seems to play a role here. These results lead us to the main possible reason for the underwhelming results and for the lack of improvement using our approach for both classification tasks. The reason might be that the linking word embeddings were also calculated by using the same language model that the LM embeddings were extracted from (e.g. we concatenated BERT embeddings with linking word embeddings that were calculated using the same BERT model for masking). For that reason, the embeddings most likely do not contain any information that the LM embeddings do not already contain (i.e. no \textit{new} information is added to the LM embedding). So all in all the embedding just gets bigger but does not actually contain more information about the current data point. The question that remains is if the words themselves do play a role, or if the list of words just functions as a collection of probabilities that can be used as an embedding, regardless of the meaning of the words in it.
