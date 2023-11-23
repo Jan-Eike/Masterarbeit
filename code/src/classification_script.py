@@ -727,7 +727,8 @@ if __name__ == "__main__":
 
     print(scores)
     print()
-    
+
+    # calculate average scores
     keys = scores[0].keys()
     values = np.array([list(dictx.values()) for dictx in scores])
     mean_values = list(np.mean(values, axis=0))
