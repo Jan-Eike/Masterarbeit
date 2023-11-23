@@ -721,7 +721,7 @@ if __name__ == "__main__":
     Path(save).mkdir(parents=True, exist_ok=True)
 
     scores = []
-    for i in range(1):
+    for i in range(3):
         seed += i
         scores.append(train_loop(i, model_attributes, load, save, seed, linking_word_index, all_bool_args))
 
