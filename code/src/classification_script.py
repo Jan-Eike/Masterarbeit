@@ -239,7 +239,6 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
     tokenizer = AutoTokenizer.from_pretrained(model_attributes.model_checkpoint)
     def tokenize_function(examples):
         return tokenizer(examples["text"], padding="max_length", truncation=True)
-        #return tokenizer(examples["text"], max_length=512, truncation=True, padding=True)
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm_probability=0.15)
 
     premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data = load_all_datasets()
@@ -273,7 +272,7 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         test_dataset = test_arg_quality
         dev_dataset = dev_arg_quality
 
-        eval_steps = 250
+        eval_steps = 250 # this has to be changed in classifier file
     else:
         eval_steps = 30
     tokenized_complete = tokenized_complete = (tokenized_train, tokenized_dev, tokenized_test)
