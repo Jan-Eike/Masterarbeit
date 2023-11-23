@@ -30,6 +30,8 @@ All evaluations were run on the same hardware setup (\ref{fig:hardware1}).
 For the implementation of both language models, we use the Huggingface Transformers framework \cite{transformers}. In particular, for BERT we are using the bert-base-uncased model \cite{bertbaseuncased}; for RoBERTa we are using roberta-base \cite{robertabase}. The framework provides a straightforward way to fine tune and evaluate these LMs on a GPU \cite{berttraining}. We are using the same way of fine tuning and evaluation. We are fine tuning for $3$ epochs with a learning rate of $5 \cdot 10^{-5}$, $100$ warm up steps, and a batch size of $64$. For all the other parameters, we are using the standard parameters from the config.json file provided by both models. Both configurations are the same for the baseline models as well as the models used for masking. After fine tuning, we select the model with the highest f1-score achieved on the development dataset. \\
 The baseline models are directly evaluated on the test set; the masked LMs are used for calculating linking words probabilities as described in chapter \ref{sec:linkingembeddings}.
 
+\newpage
+
 \subsection{LightGBM Classifier and Feature Extraction}
 To implement LightGBM, we are going to use the lightgbm python package \cite{lgbmpython}. Parameters are chosen based on the description given on the LightGBM website \cite{lgbmpython} and can be found in figure \ref{fig:lgbmparams}. We decided against extensive hyperparameter tuning since we generally did not achieve better performance with different configurations.
 

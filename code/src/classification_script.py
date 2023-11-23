@@ -245,15 +245,14 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
     premise_conclusion_data, pretraining_data, chatGPT_data, arg_quality_data = load_all_datasets()
     # split data
     #premise_conclusion_train, premise_conclusion_test, premise_conclusion_dev = train_test_dev_split(premise_conclusion_data)
-    premise_conclusion_train, premise_conclusion_test, premise_conclusion_dev = premise_conclusion_data
+    train_dataset, test_dataset, dev_dataset = premise_conclusion_data
     train_pre_dataset, test_pre_dataset = train_test_split_custom(pretraining_data)
     train_pre_chatgpt_dataset, test_pre_chatgpt_dataset = train_test_split_custom(chatGPT_data)
     train_arg_quality, test_arg_quality, dev_arg_quality = arg_quality_data
     # tokenize premise conclusion data
-    tokenized_train = premise_conclusion_train.map(tokenize_function, batched=True)
-    tokenized_test = premise_conclusion_test.map(tokenize_function, batched=True)
-    tokenized_dev = premise_conclusion_dev.map(tokenize_function, batched=True)
-    tokenized_complete = (tokenized_train, tokenized_dev, tokenized_test)
+    tokenized_train = train_dataset.map(tokenize_function, batched=True)
+    tokenized_test = test_dataset.map(tokenize_function, batched=True)
+    tokenized_dev = dev_dataset.map(tokenize_function, batched=True)
     # tokenize pretraining data
     tokenized_train_pre = train_pre_dataset.map(tokenize_function, batched=True)
     tokenized_test_pre = test_pre_dataset.map(tokenize_function, batched=True)
@@ -264,7 +263,20 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
     tokenized_train_arg_quality = train_arg_quality.map(tokenize_function, batched=True)
     tokenized_test_arg_quality = test_arg_quality.map(tokenize_function, batched=True)
     tokenized_dev_arg_quality = dev_arg_quality.map(tokenize_function, batched=True)
-    tokenized_complete = (tokenized_train_arg_quality, tokenized_dev_arg_quality, tokenized_test_arg_quality) # CHANGE
+
+    if stance:
+        tokenized_train = tokenized_train_arg_quality
+        tokenized_test = tokenized_test_arg_quality
+        tokenized_dev = tokenized_dev_arg_quality
+
+        train_dataset = train_arg_quality
+        test_dataset = test_arg_quality
+        dev_dataset = dev_arg_quality
+
+        eval_steps = 250
+    else:
+        eval_steps = 30
+    tokenized_complete = tokenized_complete = (tokenized_train, tokenized_dev, tokenized_test)
 
     # load already fine tuned model
     if load_prev or not train:
@@ -285,7 +297,7 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         warmup_steps=100,
         load_best_model_at_end=True,
         evaluation_strategy=IntervalStrategy.STEPS,
-        eval_steps=250, # 250 30 CHANGE
+        eval_steps=eval_steps,
         save_total_limit=10,
         metric_for_best_model="eval_loss",
         eval_accumulation_steps=10,
@@ -371,21 +383,21 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
             warmup_steps=100,
             load_best_model_at_end=True,
             evaluation_strategy=IntervalStrategy.STEPS,
-            eval_steps=250, # 250 30 # CHANGE same in classifier file
+            eval_steps=eval_steps,
             save_total_limit=10,
-            save_steps=250 # 250 30 # CHANGE same in classifier file
+            save_steps=eval_steps
         )
         trainer = transformers.Trainer(
             model=model_class,
-            train_dataset=tokenized_train_arg_quality, # CHANGE
-            eval_dataset=tokenized_dev_arg_quality, # CHANGE
+            train_dataset=tokenized_train, # CHANGE
+            eval_dataset=tokenized_dev, # CHANGE
             compute_metrics=compute_metrics,
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
             args=training_args
         )
         trainer.train()
         trainer.model.eval()
-        baseline_scores = trainer.evaluate(eval_dataset=tokenized_test_arg_quality)["eval_f1"] # CHANGE
+        baseline_scores = trainer.evaluate(eval_dataset=tokenized_test)["eval_f1"] # CHANGE
         print("Baseline test f1: {}".format(baseline_scores))
         trainer.save_model(output_dir=save+"/LM_classification")
 
@@ -418,13 +430,13 @@ def train_loop(save_i, model_attributes, load, save, seed, linking_word_index, a
         embedding_test = np.load(load + '/embedding_test.npy', allow_pickle=True)
         embedding_dev = np.load(load + '/embedding_dev.npy', allow_pickle=True)
     elif stance:
-        embedding_train = calculate_embedding_vector_stance(train_arg_quality, tokenizer, model, words, word_mapping, model_attributes)
-        embedding_test = calculate_embedding_vector_stance(test_arg_quality, tokenizer, model, words, word_mapping, model_attributes)
-        embedding_dev = calculate_embedding_vector_stance(dev_arg_quality, tokenizer, model, words, word_mapping, model_attributes)
+        embedding_train = calculate_embedding_vector_stance(train_dataset, tokenizer, model, words, word_mapping, model_attributes)
+        embedding_test = calculate_embedding_vector_stance(test_dataset, tokenizer, model, words, word_mapping, model_attributes)
+        embedding_dev = calculate_embedding_vector_stance(dev_dataset, tokenizer, model, words, word_mapping, model_attributes)
     else:
-        embedding_train = calculate_embedding_vector(premise_conclusion_train, tokenizer, model, words, word_mapping)
-        embedding_test = calculate_embedding_vector(premise_conclusion_test, tokenizer, model, words, word_mapping)
-        embedding_dev = calculate_embedding_vector(premise_conclusion_dev, tokenizer, model, words, word_mapping)
+        embedding_train = calculate_embedding_vector(train_dataset, tokenizer, model, words, word_mapping)
+        embedding_test = calculate_embedding_vector(test_dataset, tokenizer, model, words, word_mapping)
+        embedding_dev = calculate_embedding_vector(dev_dataset, tokenizer, model, words, word_mapping)
     np.save(save + '/embedding_train.npy', embedding_train, allow_pickle=True)
     np.save(save + '/embedding_test.npy', embedding_test, allow_pickle=True)
     np.save(save + '/embedding_dev.npy', embedding_dev, allow_pickle=True)

@@ -219,9 +219,13 @@ Before we start looking at the results, we have to note that comparing our resul
   	\label{fig:validityresults2}
 \end{table}
 
+\newpage
+
 When looking at the results for validity classification, we notice that for configurations that used the individual training approach the model barely learns anything and would only outperform a random classifier by about $0.05$ in f1-score. Configurations that use the matrix embedding $E_{Matrix}$ tend to perform slightly worse than configurations that do not use them. Also, feature selection does not increase the f1-score in most cases. Only the complete training approach can compete with the baseline. Both achieve f1-scores of about $0.75$ - $0.76$. The only configurations that outperform the baseline are 
 Complete NN + $E$ + $\textit{FE}^-$ and Complete NN + $E$ + $\textit{FE}^+$ with an f1-score of $0.769$. The results are also essentially equal along all sets of linking words. There are some exceptions though: For the longer two lists $L_3$ and $L_4$ the feature extraction performs a little bit better than for the other two lists. \\
 We also want to point out that f1-scores on the dev set during training and fine tuning are usually higher by about $0.02$ which shows that we do not overfit on the development set, which could have been a reason for the worse performance of most of the models.
+
+\newpage
 
 \begin{table}[h]
   	\tiny
@@ -322,7 +326,7 @@ We also want to point out that f1-scores on the dev set during training and fine
   	\label{fig:stanceresults}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[H]
   	\tiny
   	\centering
 	\begin{subtable}{.5\textwidth}

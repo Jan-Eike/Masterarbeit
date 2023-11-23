@@ -82,8 +82,8 @@ We also chose to apply another method to calculate the embedding for validity cl
 \end{enumerate}
 
 \subsubsection{BERT and RoBERTa embeddings} \label{sec:bertembeddings}
-As described in chapter 2, BERT outputs a vector representation for each token in the sequence, including special tokens. To generate embeddings for the entire sequence we have to somehow transform these vectors into one. The following approach works for BERT as well as for RoBERTa.\\
-Given an input sequence of length $l$, including all special tokens, BERT produces an output representation of shape ($l$, $H$), where $H$ is the hidden dimension of BERT (in our case always $768$). We will use two different ways to generate an embedding of shape ($1$, $H$), which we can then use for classification. The first way is the standard way explained in chapter 2, proposed by Devlin et. al. \cite{bert}. It assumes that the first token in the sequence, namely the [CLS] token, can be used as an aggregate representation of the entire sequence and hence be a suitable embedding for it. The other way is taking the average of all the token vectors along the first dimension. Both ways yield the desired embedding vector of shape ($1$, $H$).
+As described in chapter \ref{sec:bert111}, BERT outputs a vector representation for each token in the sequence, including special tokens. To generate embeddings for the entire sequence we have to somehow transform these vectors into one. The following approach works for BERT as well as for RoBERTa.\\
+Given an input sequence of length $l$, including all special tokens, BERT produces an output representation of shape ($l$, $H$), where $H$ is the hidden dimension of BERT (in our case always $768$). We will use two different ways to generate an embedding of shape ($1$, $H$), which we can then use for classification. The first way is the standard way explained in chapter \ref{sec:bert111}, proposed by Devlin et. al. \cite{bert}. It assumes that the first token in the sequence, namely the [CLS] token, can be used as an aggregate representation of the entire sequence and hence be a suitable embedding for it. The other way is taking the average of all the token vectors along the first dimension. Both ways yield the desired embedding vector of shape ($1$, $H$).
 
 \subsubsection{Classifier}
 We are using two different classifiers. The first one is a simple neural net. We use the same architecture as the one that is used in BertForSequenceClassification from the transformer package \cite{bertimpl}. It consists of one dropout layer and one linear layer, followed by a softmax layer, as shown in figure \ref{fig:nn1}. In the case of using the concatenated embeddings, the linear layer transforms the input matrix from shape $(D, \, |E| + H)$ to shape ($D$, $2$) where $D$ is the number of data points in the dataset. 
@@ -97,6 +97,8 @@ We are using two different classifiers. The first one is a simple neural net. We
 
 For the second classifier, we will use a gradient-boosted tree, precisely LightGBM \cite{lgbm}.
 
+\newpage
+
 \subsubsection{Feature selection}
 Before passing the embedding vectors to the classifier, we apply feature selection to improve the performance of our model, by discarding features with low importance. This importance is calculated by the built-in method of LightGBM \cite{lgbmimportance}. We use different metrics to decide below which importance features are discarded, e.g. discarding all features whose importance is below the mean importance. The best working metric for us is discarding all features whose importance is lower than $\frac{\text{average importance}}{4}$. This will be discussed in more detail in the implementation chapter.
 
@@ -105,7 +107,7 @@ Combining all steps gives us the model shown in figure \ref{fig:model-architectu
 
 \begin{figure}[H]
   \centering
-  \includegraphics[scale=0.6]{fig/model_complete.png}
+  \includegraphics[scale=0.4]{fig/model_complete.png}
   \caption{Complete Model Architecture for validity classification with BERT.}%
   \label{fig:model-architecture_full}
 \end{figure}

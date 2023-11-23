@@ -46,7 +46,7 @@ Our second main task is called stance detection. It is a classification task in 
   \label{fig:stance_class1}
 \end{table}
 
-Unfortunately, the paper providing the data for stance detection \cite{ibm} evaluates the data on a different task than we do. Therefore we cannot compare our results on this specific dataset. However looking at other approaches, the most successful ones use graph neural networks, like Relational Graph Transformers (RGT) \cite{rgt} or Simple Heterogeneous Graph Neural Network (S-HGN) \cite{shgn}.
+Unfortunately, the paper providing the data for stance detection \cite{ibm} evaluates the data on a different task than we do. Therefore, we cannot compare our results on this specific dataset. However, looking at other approaches, the most successful ones use graph neural networks, like Relational Graph Transformers (RGT) \cite{rgt} or Simple Heterogeneous Graph Neural Network (S-HGN) \cite{shgn}.
 
 \subsection{Linking words}
 As described in the beginning, we will use the probabilities of linking words to be at certain positions in a text to create additional features for our classifiers. We will use different lists of linking words as well as a list of words which are not necessarily considered linking words. The main list of linking words is the following:
@@ -60,6 +60,8 @@ The chosen list is composed of words that indicate a conclusion, like \say{there
 	$L_2$ = [the, be, to, of, and, a, in, that, have, I, it, for, not, on, with, he, as, you, do]
 \end{center}
 Comparing the results for both lists can give us more insight about whether the words in these lists actually play a role. We also added a list with $90$ linking words and one list with the $90$ most common English words to further compare the influence of these words. Both of these lists can be found in the appendix.
+
+\newpage
 
 \subsection{Language Models}
 As hinted in the introduction, we will use language models to assign probabilities to linking words at certain positions in a text. A language model (LM) is a model that assigns probabilities to sequences of words \cite{languagemodels2023}. There are various types of LMs, achieving better performances in different areas. Especially since the release of ChatGPT \cite{chatgpt}, autoregressive models like GPT-3 have become very popular. These models assign probabilities to words, based on the context before the word, and therefore generate one word after another based on these probabilities to generate text \cite{gpt3}. Other models, like BERT \cite{bert}, use a bidirectional approach, which we will explain in detail in the next part. These bidirectional models are able to predict a masked word from a sentence, based on its left and right context. The model will then return a set of words and their corresponding probabilities to fill a [MASK] token \cite{bert}, as shown in Figure \ref{fig:bert_masking_example}.
@@ -90,9 +92,11 @@ The second example shows why we need to use bidirectional models instead of auto
 LMs are often times pre-trained on large, unlabeled text corpora to generate language representations like word vector embeddings which can later be fine-tuned on more specific tasks. In the next sections, we will present two models that we are going to use.
 
 
-\subsubsection{BERT}
-BERT (Bidirectional Encoder Representations from Transformers) is an LM proposed by Devlin et al. \cite{bert}. Unlike older language models based on LSTMs, which can only predict the next token based on the previous tokens, BERT uses a bidirectional approach. This is done by using the masked LM pre-training objective. In this approach, one or more of the input words gets masked and the training objective is to predict the original word based on its left and right context. Together with the next sentence prediction objective, this completes the pre-training for BERT. This model can now be used to solve many downstream tasks like classification or question answering, just by adding another layer on top, depending on the specific task. BERT set new state-of-the-art performances for many NLP tasks and revolutionized the classic NLP pipeline due to it representing all the steps of the pipeline in one model \cite{bertexplain}.  \\
+\subsubsection{BERT} \label{sec:bert111}
+BERT (Bidirectional Encoder Representations from Transformers) is an LM proposed by Devlin et al. \cite{bert}. Unlike older language models based on LSTMs, which can only predict the next token based on the previous tokens, BERT uses a bidirectional approach. This is done by using the masked LM pre-training objective. In this approach, one or more of the input words get masked and the training objective is to predict the original words based on their left and right context. Together with the next sentence prediction objective, this completes the pre-training for BERT. This model can now be used to solve many downstream tasks like classification or question answering, just by adding another layer on top, depending on the specific task. BERT set new state-of-the-art performances for many NLP tasks and revolutionized the classic NLP pipeline due to it representing all the steps of the pipeline in one model \cite{bertexplain}.  \\
 We will primarily use BERT for masked language modeling and directly for validity and stance classification. There are different types of BERT one can consider, differing for example in the number of parameters, language or case sensitivity. The exact configurations and models used will be explained in detail in the chapter about implementation. \\
+
+\newpage
 
 \textbf{Model Architecture} \\
 Although we do not need to understand BERT in every detail, one important part is needed in the course of this thesis: namely how the input and output is represented. \\

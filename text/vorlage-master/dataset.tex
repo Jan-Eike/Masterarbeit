@@ -7,7 +7,7 @@ We will primarily use two datasets: one for validity classification, and one for
 The dataset for validity classification is taken from the shared task on predicting validity and novelty of arguments \cite{argsvalidnovel2022}. After discarding columns that are irrelevant for our work, each sample consists of the following columns:
 \begin{enumerate}
 	\item[\textbullet] Topic: Title of the debate
-	\item[\textbullet] Premise: Some sentence about the topic
+	\item[\textbullet] Premise: Sentences about the topic
 	\item[\textbullet] Conclusion: Conclusion of the premise
 	\item[\textbullet] Validity
 	\begin{enumerate}
@@ -48,7 +48,7 @@ The dataset for stance classification is taken from the the \say{IBM project deb
 	\end{enumerate}
 \end{enumerate}
 The data is split with a ratio of about $0.7$, $0.2$, $0.1$ in train, dev and test data with a total of \num[group-separator={,}]{30497} data points, all in English language. Both labels roughly have a $50\%$ probability of occurrence. The statements in this dataset vary across a wide variety of subjects. Each statement has at most $6$ arguments \cite{stancedata} but most of the time just one. \\
-We decided to use another dataset besides, the validity dataset since it only consists of \num[group-separator={,}]{1472} data points, which is a comparably small number for deep learning tasks. A sample data point is shown in Table \ref{fig:examplestancedata}.
+We decided to use another dataset besides the validity dataset since it only consists of \num[group-separator={,}]{1472} data points, which is a comparably small number for deep learning tasks. A sample data point is shown in Table \ref{fig:examplestancedata}.
 
 \begin{table}[H]
 	\begin{center}
@@ -84,6 +84,8 @@ where we replace <linking word> with each of the linking words we decided to use
 	\caption{Example for ChatGPT data. Generated 16-August-2023.}%
   	\label{fig:examplechatgptdata}
 \end{figure}
+
+\newpage
 
 \subsection{Preprocessing}
 
