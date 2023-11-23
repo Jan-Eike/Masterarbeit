@@ -16,7 +16,7 @@ def preprocess_logits_for_metrics(logits, labels):
 
 def compute_metrics(p):    
     preds, labels = p
-    f1 = f1_score(y_true=labels, y_pred=preds)
+    f1 = f1_score(y_true=labels, y_pred=preds, average="macro")
     #f1 = accuracy_score(labels, preds)
     return {"f1": f1} 
 
